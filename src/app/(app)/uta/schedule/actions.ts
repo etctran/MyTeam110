@@ -115,6 +115,15 @@ export async function moveToOpenShift(fromShiftId: string, toShiftId: string): P
   const user = await requireUser();
 
   return prisma.$transaction(async (tx) => {
+    // Lock both shift rows (consistent order so two concurrent moves never
+    // deadlock on each other) before reading headcounts. Without this, two
+    // TAs moving into the same shift's last open slot at nearly the same
+    // instant could both pass the maxTas check under READ COMMITTED — the
+    // second transaction's FOR UPDATE blocks until the first commits, so it
+    // sees the real post-move count, not a stale one.
+    const [firstId, secondId] = [fromShiftId, toShiftId].sort();
+    await tx.$queryRaw`SELECT id FROM "Shift" WHERE id IN (${firstId}, ${secondId}) FOR UPDATE`;
+
     const [fromShift, toShift] = await Promise.all([
       tx.shift.findUniqueOrThrow({ where: { id: fromShiftId }, include: { assignments: true } }),
       tx.shift.findUniqueOrThrow({ where: { id: toShiftId }, include: { assignments: true } }),
@@ -205,6 +214,11 @@ export async function respondToSwapRequest(swapRequestId: string, accept: boolea
   let requesterId: string | null = null;
 
   return prisma.$transaction(async (tx) => {
+    // Lock the request row before reading its status — otherwise two
+    // concurrent responses (e.g. a double-click) could both observe
+    // PENDING and both execute the transfer, moving the shift twice.
+    await tx.$queryRaw`SELECT id FROM "SwapRequest" WHERE id = ${swapRequestId} FOR UPDATE`;
+
     const swapRequest = await tx.swapRequest.findUniqueOrThrow({ where: { id: swapRequestId } });
     requesterId = swapRequest.requesterId;
 
