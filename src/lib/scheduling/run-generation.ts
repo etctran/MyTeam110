@@ -25,8 +25,9 @@ export async function runScheduleGeneration(excludeProfessorId?: string) {
       select: { id: true, weeklyQuota: true, isSenior: true },
     }),
     prisma.availability.findMany(),
+    // Lecture help is a standing roster now, not tied to a Week — every
+    // assigned section-day counts against a TA's quota every week alike.
     prisma.lectureHelpSignup.findMany({
-      where: { slot: { weekId: week.id } },
       select: { userId: true, hours: true },
     }),
     prisma.user.findMany({ where: { role: "PROFESSOR" }, select: { id: true } }),

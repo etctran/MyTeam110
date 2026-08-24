@@ -1,7 +1,12 @@
 /**
  * effectiveQuota logic — §6:
- *   lectureHelpHours = sum(hours from that User's LectureHelpSignups for this Week)
+ *   lectureHelpHours = sum(hours from that User's LectureHelpSignups)
  *   effectiveQuota   = max(0, weeklyQuota - lectureHelpHours)
+ *
+ * lectureHelpHours is a flat count of assigned section-days, not a
+ * duration: one lecture-help assignment always drops exactly one
+ * office-hour slot, regardless of how long that section's period runs
+ * (see LectureHelpSignup.hours, always created as 1).
  *
  * Kept as a pure, standalone function per the Build Order (§9 Phase 4:
  * "quota reduction logic implemented and unit-tested on its own") so the
@@ -14,19 +19,4 @@ export function computeEffectiveQuota(
 ): number {
   const quota = weeklyQuota ?? 0;
   return Math.max(0, quota - lectureHelpHours);
-}
-
-/**
- * Duration of a "HH:MM"–"HH:MM" slot, in whole hours. LectureHelpSignup.hours
- * is an Int (§3), so a slot that isn't an exact multiple of 60 minutes (e.g.
- * a 50-minute lecture) is rounded to the nearest hour, minimum 1 — there's
- * no finer-grained unit for quota math in this schema.
- */
-export function slotDurationHours(startTime: string, endTime: string): number {
-  const toMinutes = (t: string) => {
-    const [h, m] = t.split(":").map(Number);
-    return h * 60 + m;
-  };
-  const minutes = toMinutes(endTime) - toMinutes(startTime);
-  return Math.max(1, Math.round(minutes / 60));
 }

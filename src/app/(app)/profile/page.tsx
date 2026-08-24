@@ -38,7 +38,9 @@ async function MyData({
 }) {
   const [hoursAssigned, lectureHelpSignups, availabilityRows, sentSwaps, receivedSwaps] = await Promise.all([
     prisma.shiftAssignment.count({ where: { userId, shift: { weekId } } }),
-    prisma.lectureHelpSignup.findMany({ where: { userId, slot: { weekId } }, select: { hours: true } }),
+    // Lecture help is a standing roster (not week-scoped) — every current
+    // assignment counts against quota every week alike.
+    prisma.lectureHelpSignup.findMany({ where: { userId }, select: { hours: true } }),
     prisma.availability.findMany({ where: { userId }, orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }] }),
     prisma.swapRequest.findMany({
       where: { requesterId: userId },
@@ -126,13 +128,12 @@ async function TeamData({ weekId }: { weekId: string }) {
     }),
     prisma.lectureHelpSignup.groupBy({
       by: ["userId"],
-      where: { slot: { weekId } },
       _sum: { hours: true },
     }),
   ]);
 
   const hoursMap = new Map(hoursByUser.map((h) => [h.userId, h._count._all]));
-  const lectureHoursMap = new Map(lectureHoursByUser.map((h) => [h.userId, h._sum.hours ?? 0]));
+  const lectureHoursMap = new Map(lectureHoursByUser.map((h) => [h.userId, h._sum?.hours ?? 0]));
 
   const rows: TeamRow[] = tas.map((ta) => {
     const lectureHelpHours = lectureHoursMap.get(ta.id) ?? 0;

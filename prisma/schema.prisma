@@ -63,7 +63,6 @@ model Week {
   generatedAt   DateTime?
   status        String // DRAFT | PUBLISHED
   shifts        Shift[]
-  lectureHelpSlots LectureHelpSlot[]
 }
 
 model Shift {
@@ -104,15 +103,20 @@ model SwapRequest {
   resolvedAt  DateTime?
 }
 
+// A fixed, standing roster — not tied to a Week. One row per (section,
+// day the section meets); rows sharing courseInfo/instructors/location/
+// time are grouped in the UI into one section spanning multiple days,
+// same shape as the real recitation-section schedule this models.
 model LectureHelpSlot {
-  id         String   @id @default(cuid())
-  weekId     String
-  week       Week     @relation(fields: [weekId], references: [id])
-  courseInfo String // e.g. "CS 201 — Mon 10:00 lecture"
-  dayOfWeek  Int
-  startTime  String
-  endTime    String
-  capacity   Int      @default(1) // how many TAs can help this lecture
+  id          String   @id @default(cuid())
+  courseInfo String // section name, e.g. "Section 001"
+  instructors String // e.g. "Hinks & Jordan"
+  location    String // e.g. "Hanes Art, room 121"
+  dayOfWeek   Int
+  startTime   String
+  endTime     String
+  capacity    Int      @default(6) // how many TAs can help this section on this day
+  createdAt   DateTime @default(now())
 
   signups LectureHelpSignup[]
 }
@@ -123,7 +127,7 @@ model LectureHelpSignup {
   slot   LectureHelpSlot @relation(fields: [slotId], references: [id])
   userId String
   user   User            @relation(fields: [userId], references: [id])
-  hours  Int // duration of the slot, cached here for quota math
+  hours  Int // always 1 — one assigned section-day drops one office-hour slot
 
   @@unique([slotId, userId])
 }
