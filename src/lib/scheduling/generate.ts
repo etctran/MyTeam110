@@ -57,7 +57,7 @@ export function generateSchedule(
   const operatingHours: Record<number, { start: number; end: number }> =
     options.operatingHours ?? OPERATING_HOURS;
   const minTas = options.minTas ?? 3;
-  const maxTas = options.maxTas ?? 7;
+  const maxTas = options.maxTas ?? 6;
 
   const remainingQuota = new Map<string, number>();
   const isSenior = new Map<string, boolean>();

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Shift" ALTER COLUMN "maxTas" SET DEFAULT 6;

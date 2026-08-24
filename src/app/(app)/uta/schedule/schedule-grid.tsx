@@ -36,6 +36,10 @@ function keyOf(day: number, hour: number) {
   return `${day}:${hour}`;
 }
 
+function firstName(fullName: string) {
+  return fullName.split(" ")[0];
+}
+
 export function ScheduleGrid({
   shifts,
   allTas,
@@ -76,7 +80,7 @@ export function ScheduleGrid({
     <div>
       <div
         className="inline-grid select-none gap-px rounded-lg border border-border bg-border"
-        style={{ gridTemplateColumns: `4rem repeat(${OPERATING_DAYS.length}, 7rem)` }}
+        style={{ gridTemplateColumns: `4rem repeat(${OPERATING_DAYS.length}, 8.5rem)` }}
       >
         <div className="bg-bg" />
         {OPERATING_DAYS.map((day) => (
@@ -115,7 +119,7 @@ export function ScheduleGrid({
                   aria-pressed={isSelected}
                   aria-label={`${DAY_LABELS[day as DayOfWeek]} ${formatHour(hour)}`}
                   className={
-                    "relative flex h-12 w-full flex-col items-center justify-center gap-0.5 px-1 text-[11px] leading-tight transition-colors " +
+                    "relative flex min-h-12 w-full flex-col items-start gap-0.5 px-2 py-1.5 text-[11px] leading-tight transition-colors " +
                     (!inBounds
                       ? "cursor-not-allowed bg-bg-input/40"
                       : isSelected
@@ -131,19 +135,30 @@ export function ScheduleGrid({
                   {(openToJoin || eligibleToMove) && (
                     <span
                       className={
-                        "absolute right-1 top-1 h-1.5 w-1.5 rounded-full " +
+                        "absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full " +
                         (openToJoin ? "bg-accent" : "bg-text-muted")
                       }
                     />
                   )}
                   {shift ? (
                     <>
-                      <span className="font-medium text-text">
+                      <span className="flex w-full items-center gap-1.5 pr-2 font-medium text-text">
                         {shift.assignments.length}/{shift.maxTas}
+                        {shift.assignments.length < shift.minTas && (
+                          <span className="font-normal text-danger">low</span>
+                        )}
                       </span>
-                      {shift.assignments.length < shift.minTas && (
-                        <span className="text-danger">low</span>
-                      )}
+                      {shift.assignments.map((a) => (
+                        <span
+                          key={a.id}
+                          className={
+                            "w-full truncate text-left " +
+                            (a.user.id === currentUserId ? "text-text" : "text-text-muted")
+                          }
+                        >
+                          {firstName(a.user.name)}
+                        </span>
+                      ))}
                     </>
                   ) : (
                     <span className="text-text-muted">—</span>
@@ -203,7 +218,7 @@ function CellDetail({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [minTas, setMinTas] = useState(3);
-  const [maxTas, setMaxTas] = useState(7);
+  const [maxTas, setMaxTas] = useState(6);
   const [pickedTa, setPickedTa] = useState("");
   const [pickedTeammate, setPickedTeammate] = useState("");
   const [pickedTheirShift, setPickedTheirShift] = useState("");

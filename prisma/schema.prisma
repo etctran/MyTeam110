@@ -73,7 +73,7 @@ model Shift {
   startTime String // "11:00"
   endTime   String // "12:00" — shifts are 1-hour blocks
   minTas    Int      @default(3)
-  maxTas    Int      @default(7)
+  maxTas    Int      @default(6)
 
   assignments ShiftAssignment[]
 }

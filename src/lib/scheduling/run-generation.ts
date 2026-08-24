@@ -75,7 +75,7 @@ export async function runScheduleGeneration(excludeProfessorId?: string) {
           startTime: formatTime(result.hour),
           endTime: formatTime(result.hour + 1),
           minTas: 3,
-          maxTas: 7,
+          maxTas: 6,
         },
       });
 
