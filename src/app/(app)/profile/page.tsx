@@ -5,6 +5,7 @@ import { computeEffectiveQuota } from "@/lib/scheduling/quota";
 import { PageHeader } from "@/components/app-shell/app-shell";
 import { DAY_LABELS, formatHour, type DayOfWeek } from "@/lib/operating-hours";
 import { TeamTable, type TeamRow } from "./team-table";
+import { AddTaForm } from "./add-ta-form";
 
 export default async function ProfilePage() {
   const user = await requireUser();
@@ -155,6 +156,7 @@ async function TeamData({ weekId }: { weekId: string }) {
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">
         Team data — this week
       </h2>
+      <AddTaForm />
       <TeamTable rows={rows} />
     </>
   );
