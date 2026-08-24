@@ -79,13 +79,15 @@ model Shift {
 }
 
 model ShiftAssignment {
-  id          String  @id @default(cuid())
-  shiftId     String
-  shift       Shift   @relation(fields: [shiftId], references: [id])
-  userId      String
-  user        User    @relation(fields: [userId], references: [id])
-  isLead      Boolean @default(false)
-  openForSwap Boolean @default(false) // posted to the open-swap pool
+  id      String  @id @default(cuid())
+  shiftId String
+  shift   Shift   @relation(fields: [shiftId], references: [id])
+  userId  String
+  user    User    @relation(fields: [userId], references: [id])
+  isLead  Boolean @default(false)
+  // No "posted to pool" flag: swapping shifts is a direct self-move
+  // (headcount-gated, no posting step) — see moveToOpenShift in
+  // uta/schedule/actions.ts.
 
   @@unique([shiftId, userId])
 }

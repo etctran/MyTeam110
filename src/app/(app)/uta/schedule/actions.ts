@@ -95,82 +95,54 @@ export async function toggleLead(shiftId: string, userId: string, isLead: boolea
  * Swap flows — §7. Two distinct mechanisms, matching the two "Claim"/
  * "Request" buttons described in §5's cell panel:
  *
- *  - Open pool (postToOpenSwapPool / cancelOpenSwapPost / claimOpenSwapShift):
- *    flips ShiftAssignment.openForSwap and, on claim, transfers the seat
- *    instantly — "no approval needed since it's already been opened up."
- *    No SwapRequest/Notification involved.
+ *  - Self-move (moveToOpenShift): a TA can move themselves from a shift
+ *    they're on with room to spare (headcount > minTas) directly into any
+ *    other shift with room to add them (headcount < maxTas) they're
+ *    available for — instant, no posting step, no approval. Headcount is
+ *    the only gate; no one else needs to opt in first.
  *  - Direct request (requestSwap / respondToSwapRequest): always targets a
  *    specific teammate, goes through SwapRequest (PENDING -> ACCEPTED/
  *    DENIED) with a Notification, and only takes effect once they accept.
  */
 
-export async function postToOpenSwapPool(shiftId: string): Promise<ActionResult> {
-  const user = await requireUser();
-
-  const shift = await prisma.shift.findUniqueOrThrow({
-    where: { id: shiftId },
-    include: { assignments: true },
-  });
-  const mine = shift.assignments.find((a) => a.userId === user.id);
-  if (!mine) return { ok: false, error: "You're not assigned to this shift." };
-
-  if (shift.assignments.length <= shift.minTas) {
-    return { ok: false, error: `Removing you would drop this shift below its minimum of ${shift.minTas}.` };
-  }
-
-  await prisma.shiftAssignment.update({
-    where: { shiftId_userId: { shiftId, userId: user.id } },
-    data: { openForSwap: true },
-  });
-
-  revalidatePath("/uta/schedule");
-  return { ok: true };
-}
-
-export async function cancelOpenSwapPost(shiftId: string): Promise<ActionResult> {
-  const user = await requireUser();
-  await prisma.shiftAssignment.updateMany({
-    where: { shiftId, userId: user.id },
-    data: { openForSwap: false },
-  });
-  revalidatePath("/uta/schedule");
-  return { ok: true };
-}
-
-export async function claimOpenSwapShift(shiftId: string): Promise<ActionResult> {
+export async function moveToOpenShift(fromShiftId: string, toShiftId: string): Promise<ActionResult> {
   const user = await requireUser();
 
   return prisma.$transaction(async (tx) => {
-    const shift = await tx.shift.findUniqueOrThrow({
-      where: { id: shiftId },
-      include: { assignments: true },
-    });
+    const [fromShift, toShift] = await Promise.all([
+      tx.shift.findUniqueOrThrow({ where: { id: fromShiftId }, include: { assignments: true } }),
+      tx.shift.findUniqueOrThrow({ where: { id: toShiftId }, include: { assignments: true } }),
+    ]);
 
-    const posted = shift.assignments.find((a) => a.openForSwap);
-    if (!posted) return { ok: false, error: "This shift isn't open for claiming anymore." };
-    if (posted.userId === user.id) return { ok: false, error: "You can't claim your own post." };
-    if (shift.assignments.some((a) => a.userId === user.id)) {
-      return { ok: false, error: "You're already assigned to this shift." };
+    const mine = fromShift.assignments.find((a) => a.userId === user.id);
+    if (!mine) return { ok: false, error: "You're not assigned to that shift." };
+
+    if (fromShift.assignments.length <= fromShift.minTas) {
+      return { ok: false, error: `Leaving would drop that shift below its minimum of ${fromShift.minTas}.` };
+    }
+    if (toShift.assignments.some((a) => a.userId === user.id)) {
+      return { ok: false, error: "You're already assigned to that shift." };
+    }
+    if (toShift.assignments.length >= toShift.maxTas) {
+      return { ok: false, error: `That shift is already at its max of ${toShift.maxTas}.` };
     }
 
     const available = await tx.availability.findFirst({
       where: {
         userId: user.id,
-        dayOfWeek: shift.dayOfWeek,
-        startTime: { lte: shift.startTime },
-        endTime: { gte: shift.endTime },
+        dayOfWeek: toShift.dayOfWeek,
+        startTime: { lte: toShift.startTime },
+        endTime: { gte: toShift.endTime },
       },
     });
-    if (!available) return { ok: false, error: "You're not available for this hour." };
+    if (!available) return { ok: false, error: "You're not available for that shift." };
 
-    await tx.shiftAssignment.delete({ where: { shiftId_userId: { shiftId, userId: posted.userId } } });
-    await tx.shiftAssignment.create({ data: { shiftId, userId: user.id } });
+    await tx.shiftAssignment.delete({ where: { shiftId_userId: { shiftId: fromShiftId, userId: user.id } } });
+    await tx.shiftAssignment.create({ data: { shiftId: toShiftId, userId: user.id } });
 
     return { ok: true } as const;
   }).then((result) => {
-    if (result.ok) {
-      revalidatePath("/uta/schedule");
-    }
+    if (result.ok) revalidatePath("/uta/schedule");
     return result;
   });
 }

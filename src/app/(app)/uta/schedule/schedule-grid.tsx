@@ -3,11 +3,9 @@
 import { useMemo, useState, useTransition } from "react";
 import {
   assignTaToShift,
-  cancelOpenSwapPost,
-  claimOpenSwapShift,
   createShift,
   deleteShift,
-  postToOpenSwapPool,
+  moveToOpenShift,
   removeAssignment,
   requestSwap,
   toggleLead,
@@ -28,7 +26,7 @@ export type ShiftData = {
   startTime: string;
   minTas: number;
   maxTas: number;
-  assignments: { id: string; isLead: boolean; openForSwap: boolean; user: { id: string; name: string } }[];
+  assignments: { id: string; isLead: boolean; user: { id: string; name: string } }[];
 };
 
 export type TaOption = { id: string; name: string };
@@ -98,14 +96,15 @@ export function ScheduleGrid({
               const mine = shift?.assignments.find((a) => a.user.id === currentUserId);
               const isSelected = selected?.day === day && selected.hour === hour;
 
+              // §5 visual signals: headcount alone decides eligibility, no
+              // "posted" step — matches moveToOpenShift's actual gate.
               const openToJoin =
                 inBounds &&
                 !!shift &&
                 !mine &&
-                shift.assignments.some((a) => a.openForSwap) &&
+                shift.assignments.length < shift.maxTas &&
                 amAvailable(day, hour);
-              const eligibleToPost =
-                inBounds && !!shift && !!mine && !mine.openForSwap && shift.assignments.length > shift.minTas;
+              const eligibleToMove = inBounds && !!shift && !!mine && shift.assignments.length > shift.minTas;
 
               return (
                 <button
@@ -129,7 +128,7 @@ export function ScheduleGrid({
                     (mine ? " ring-2 ring-inset ring-accent" : "")
                   }
                 >
-                  {(openToJoin || eligibleToPost) && (
+                  {(openToJoin || eligibleToMove) && (
                     <span
                       className={
                         "absolute right-1 top-1 h-1.5 w-1.5 rounded-full " +
@@ -157,8 +156,8 @@ export function ScheduleGrid({
       </div>
 
       <p className="mt-4 text-xs text-text-muted">
-        Your own shifts are outlined. An accent dot means you could join or claim that shift; a muted
-        dot on your own shift means you could post it for swap. Click any cell for the roster
+        Your own shifts are outlined. An accent dot means you could move into that shift; a muted dot
+        on your own shift means you have room to move out of it. Click any cell for the roster
         {isProfessor ? " and to create or assign shifts" : ""}.
       </p>
 
@@ -171,8 +170,8 @@ export function ScheduleGrid({
             allTas={allTas}
             isProfessor={isProfessor}
             currentUserId={currentUserId}
-            amAvailable={amAvailable(selected.day, selected.hour)}
             shifts={shifts}
+            myAvailability={myAvailability}
           />
         ) : (
           <p className="text-sm text-text-muted">Click a cell to see who&apos;s scheduled.</p>
@@ -189,8 +188,8 @@ function CellDetail({
   allTas,
   isProfessor,
   currentUserId,
-  amAvailable,
   shifts,
+  myAvailability,
 }: {
   day: number;
   hour: number;
@@ -198,8 +197,8 @@ function CellDetail({
   allTas: TaOption[];
   isProfessor: boolean;
   currentUserId: string;
-  amAvailable: boolean;
   shifts: ShiftData[];
+  myAvailability: AvailabilityWindowData[];
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -208,10 +207,33 @@ function CellDetail({
   const [pickedTa, setPickedTa] = useState("");
   const [pickedTeammate, setPickedTeammate] = useState("");
   const [pickedTheirShift, setPickedTheirShift] = useState("");
+  const [pickedMoveShift, setPickedMoveShift] = useState("");
 
   const label = `${DAY_LABELS[day as DayOfWeek]} ${formatHour(hour)}–${formatHour(hour + 1)}`;
   const unassigned = allTas.filter((ta) => !shift?.assignments.some((a) => a.user.id === ta.id));
   const mine = shift?.assignments.find((a) => a.user.id === currentUserId);
+
+  function isAvailableForShift(s: ShiftData) {
+    const [h] = s.startTime.split(":").map(Number);
+    return myAvailability.some((w) => w.dayOfWeek === s.dayOfWeek && w.startHour <= h && h < w.endHour);
+  }
+
+  // Shifts I'm on with room to leave (headcount > min) — used when I'm
+  // viewing someone else's open shift and want to move here from one of these.
+  const myEligibleSourceShifts = shifts.filter(
+    (s) => s.assignments.some((a) => a.user.id === currentUserId) && s.assignments.length > s.minTas,
+  );
+  // Other shifts with room for me (headcount < max), available, not already mine —
+  // used when I'm viewing my own shift and want to move out to one of these.
+  const eligibleTargetShifts = shift
+    ? shifts.filter(
+        (s) =>
+          s.id !== shift.id &&
+          s.assignments.length < s.maxTas &&
+          !s.assignments.some((a) => a.user.id === currentUserId) &&
+          isAvailableForShift(s),
+      )
+    : [];
 
   const teammateOptions = allTas.filter(
     (ta) => ta.id !== currentUserId && !shift?.assignments.some((a) => a.user.id === ta.id),
@@ -219,6 +241,11 @@ function CellDetail({
   const teammateShifts = shifts.filter(
     (s) => s.id !== shift?.id && s.assignments.some((a) => a.user.id === pickedTeammate),
   );
+
+  function shiftLabel(s: ShiftData) {
+    const [h] = s.startTime.split(":").map(Number);
+    return `${DAY_LABELS[s.dayOfWeek as DayOfWeek]} ${formatHour(h)}–${formatHour(h + 1)}`;
+  }
 
   function run(action: () => Promise<{ ok: boolean; error?: string }>) {
     setError(null);
@@ -287,11 +314,6 @@ function CellDetail({
                     {a.isLead && (
                       <span className="ml-2 rounded-full bg-bg-pill-active px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-text-muted">
                         Lead
-                      </span>
-                    )}
-                    {a.openForSwap && (
-                      <span className="ml-2 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
-                        Open for swap
                       </span>
                     )}
                   </span>
@@ -363,33 +385,45 @@ function CellDetail({
           {/* --- Swap flows (§7/§5) --- */}
           {mine ? (
             <div className="flex flex-col gap-3 border-t border-border pt-3">
-              {mine.openForSwap ? (
-                <div className="flex items-center gap-3">
-                  <p className="text-sm text-text-muted">You&apos;ve posted this to the open-swap pool.</p>
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => run(() => cancelOpenSwapPost(shift.id))}
-                    className="pill-button-outline"
-                  >
-                    Cancel post
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  disabled={isPending || shift.assignments.length <= shift.minTas}
-                  onClick={() => run(() => postToOpenSwapPool(shift.id))}
-                  className="pill-button-outline self-start"
-                  title={
-                    shift.assignments.length <= shift.minTas
-                      ? `Removing you would drop below the minimum of ${shift.minTas}`
-                      : undefined
-                  }
-                >
-                  Post to open swap pool
-                </button>
-              )}
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-medium">Move to another shift</p>
+                {shift.assignments.length <= shift.minTas ? (
+                  <p className="text-xs text-text-muted">
+                    You&apos;re one of only {shift.minTas} here — moving would drop below the minimum.
+                  </p>
+                ) : eligibleTargetShifts.length === 0 ? (
+                  <p className="text-xs text-text-muted">
+                    No other shift you&apos;re available for currently has room.
+                  </p>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={pickedMoveShift}
+                      onChange={(e) => setPickedMoveShift(e.target.value)}
+                      className="field-input flex-1"
+                    >
+                      <option value="">Pick a shift…</option>
+                      {eligibleTargetShifts.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {shiftLabel(s)} ({s.assignments.length}/{s.maxTas})
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={isPending || !pickedMoveShift}
+                      onClick={() => {
+                        const target = pickedMoveShift;
+                        setPickedMoveShift("");
+                        run(() => moveToOpenShift(shift.id, target));
+                      }}
+                      className="pill-button"
+                    >
+                      Move
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-medium">Request a swap with a teammate</p>
@@ -415,14 +449,11 @@ function CellDetail({
                     className="field-input"
                   >
                     <option value="">(Optional) take one of their shifts in exchange…</option>
-                    {teammateShifts.map((s) => {
-                      const [h] = s.startTime.split(":").map(Number);
-                      return (
-                        <option key={s.id} value={s.id}>
-                          {DAY_LABELS[s.dayOfWeek as DayOfWeek]} {formatHour(h)}–{formatHour(h + 1)}
-                        </option>
-                      );
-                    })}
+                    {teammateShifts.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {shiftLabel(s)}
+                      </option>
+                    ))}
                   </select>
                 )}
                 <button
@@ -442,21 +473,42 @@ function CellDetail({
               </div>
             </div>
           ) : (
-            shift.assignments.some((a) => a.openForSwap) && (
-              <div className="border-t border-border pt-3">
-                {amAvailable ? (
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => run(() => claimOpenSwapShift(shift.id))}
-                    className="pill-button"
-                  >
-                    Claim this shift
-                  </button>
-                ) : (
+            shift.assignments.length < shift.maxTas && (
+              <div className="flex flex-col gap-2 border-t border-border pt-3">
+                <p className="text-sm font-medium">Move here from one of your shifts</p>
+                {!isAvailableForShift(shift) ? (
+                  <p className="text-xs text-text-muted">You&apos;re not marked available for this hour.</p>
+                ) : myEligibleSourceShifts.length === 0 ? (
                   <p className="text-xs text-text-muted">
-                    Open for swap, but you&apos;re not marked available for this hour.
+                    None of your current shifts have room to spare (headcount above their minimum).
                   </p>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={pickedMoveShift}
+                      onChange={(e) => setPickedMoveShift(e.target.value)}
+                      className="field-input flex-1"
+                    >
+                      <option value="">Pick one of your shifts…</option>
+                      {myEligibleSourceShifts.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {shiftLabel(s)} ({s.assignments.length}/{s.maxTas})
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={isPending || !pickedMoveShift}
+                      onClick={() => {
+                        const source = pickedMoveShift;
+                        setPickedMoveShift("");
+                        run(() => moveToOpenShift(source, shift.id));
+                      }}
+                      className="pill-button"
+                    >
+                      Move
+                    </button>
+                  </div>
                 )}
               </div>
             )
