@@ -5,6 +5,7 @@ import { getOrCreateUpcomingWeek } from "@/lib/weeks";
 import { groupLectureHelpSections } from "@/lib/lecture-help";
 import { PageHeader } from "@/components/app-shell/app-shell";
 import { DAY_LABELS, formatHour } from "@/lib/operating-hours";
+import { AlertTriangle } from "lucide-react";
 import { LectureHelpForm } from "./lecture-help-form";
 import { LectureHelpTable } from "@/app/(app)/uta/lecture-help/lecture-help-table";
 import { GenerateButton } from "./generate-button";
@@ -73,12 +74,13 @@ export default async function ProfessorPage() {
               <Link
                 key={shift.id}
                 href="/uta/schedule"
-                className="panel-card flex items-center justify-between p-3 text-sm hover:bg-bg-pill-hover"
+                className="announcement-card flex items-center justify-between p-4 text-sm transition-opacity hover:opacity-90"
               >
-                <span>
+                <span className="flex items-center gap-2.5">
+                  <AlertTriangle size={16} className="text-accent" strokeWidth={2} />
                   {dayLabel} {formatHour(hour)}–{formatHour(hour + 1)}
                 </span>
-                <span className="text-danger">
+                <span className="text-text-muted">
                   {shift.assignments.length}/{shift.minTas} min TAs
                 </span>
               </Link>
