@@ -360,6 +360,7 @@ function CellDetail({
           {isProfessor && (
             <div className="flex items-center gap-2 border-t border-border pt-3">
               <select
+                aria-label="Assign a TA"
                 value={pickedTa}
                 onChange={(e) => setPickedTa(e.target.value)}
                 className="field-input flex-1"
@@ -413,6 +414,7 @@ function CellDetail({
                 ) : (
                   <div className="flex items-center gap-2">
                     <select
+                      aria-label="Move to shift"
                       value={pickedMoveShift}
                       onChange={(e) => setPickedMoveShift(e.target.value)}
                       className="field-input flex-1"
@@ -443,6 +445,7 @@ function CellDetail({
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-medium">Request a swap with a teammate</p>
                 <select
+                  aria-label="Pick a teammate"
                   value={pickedTeammate}
                   onChange={(e) => {
                     setPickedTeammate(e.target.value);
@@ -459,6 +462,7 @@ function CellDetail({
                 </select>
                 {pickedTeammate && (
                   <select
+                    aria-label="Take their shift in exchange"
                     value={pickedTheirShift}
                     onChange={(e) => setPickedTheirShift(e.target.value)}
                     className="field-input"
@@ -500,6 +504,7 @@ function CellDetail({
                 ) : (
                   <div className="flex items-center gap-2">
                     <select
+                      aria-label="Move here from"
                       value={pickedMoveShift}
                       onChange={(e) => setPickedMoveShift(e.target.value)}
                       className="field-input flex-1"
