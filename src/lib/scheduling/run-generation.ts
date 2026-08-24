@@ -4,6 +4,7 @@ import { getOrCreateUpcomingWeek } from "@/lib/weeks";
 import { generateSchedule, type AvailabilityWindow, type SchedulingUser } from "@/lib/scheduling/generate";
 import { formatTime } from "@/lib/operating-hours";
 import { notify } from "@/lib/notifications";
+import { broadcast, notificationsChannel, SCHEDULE_CHANNEL } from "@/lib/realtime";
 
 /**
  * The DB-touching half of "Generate": pulls real availability/quota data,
@@ -103,6 +104,13 @@ export async function runScheduleGeneration(excludeProfessorId?: string) {
       });
     }
   });
+
+  await broadcast(SCHEDULE_CHANNEL);
+  await Promise.all(
+    professors
+      .filter((p) => p.id !== excludeProfessorId)
+      .map((p) => broadcast(notificationsChannel(p.id))),
+  );
 
   return { weekStartDate: week.weekStartDate, shiftCount: generated.length, needsAttentionCount };
 }

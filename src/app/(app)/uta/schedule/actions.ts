@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateUpcomingWeek } from "@/lib/weeks";
 import { formatTime } from "@/lib/operating-hours";
 import { notify } from "@/lib/notifications";
+import { broadcast, notificationsChannel, SCHEDULE_CHANNEL } from "@/lib/realtime";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -36,6 +37,7 @@ export async function createShift(day: number, hour: number, minTas: number, max
   });
 
   revalidatePath("/uta/schedule");
+  await broadcast(SCHEDULE_CHANNEL);
   return { ok: true };
 }
 
@@ -49,6 +51,7 @@ export async function deleteShift(shiftId: string): Promise<ActionResult> {
 
   await prisma.shift.delete({ where: { id: shiftId } });
   revalidatePath("/uta/schedule");
+  await broadcast(SCHEDULE_CHANNEL);
   return { ok: true };
 }
 
@@ -71,6 +74,7 @@ export async function assignTaToShift(shiftId: string, userId: string): Promise<
   });
 
   revalidatePath("/uta/schedule");
+  await broadcast(SCHEDULE_CHANNEL);
   return { ok: true };
 }
 
@@ -78,6 +82,7 @@ export async function removeAssignment(shiftId: string, userId: string): Promise
   await requireRole("PROFESSOR");
   await prisma.shiftAssignment.deleteMany({ where: { shiftId, userId } });
   revalidatePath("/uta/schedule");
+  await broadcast(SCHEDULE_CHANNEL);
   return { ok: true };
 }
 
@@ -88,6 +93,7 @@ export async function toggleLead(shiftId: string, userId: string, isLead: boolea
     data: { isLead },
   });
   revalidatePath("/uta/schedule");
+  await broadcast(SCHEDULE_CHANNEL);
   return { ok: true };
 }
 
@@ -141,8 +147,11 @@ export async function moveToOpenShift(fromShiftId: string, toShiftId: string): P
     await tx.shiftAssignment.create({ data: { shiftId: toShiftId, userId: user.id } });
 
     return { ok: true } as const;
-  }).then((result) => {
-    if (result.ok) revalidatePath("/uta/schedule");
+  }).then(async (result) => {
+    if (result.ok) {
+      revalidatePath("/uta/schedule");
+      await broadcast(SCHEDULE_CHANNEL);
+    }
     return result;
   });
 }
@@ -187,14 +196,17 @@ export async function requestSwap(
   });
 
   revalidatePath("/uta/schedule");
+  await broadcast(notificationsChannel(target.id));
   return { ok: true };
 }
 
 export async function respondToSwapRequest(swapRequestId: string, accept: boolean): Promise<ActionResult> {
   const user = await requireUser();
+  let requesterId: string | null = null;
 
   return prisma.$transaction(async (tx) => {
     const swapRequest = await tx.swapRequest.findUniqueOrThrow({ where: { id: swapRequestId } });
+    requesterId = swapRequest.requesterId;
 
     if (swapRequest.targetId !== user.id) {
       return { ok: false, error: "This request isn't addressed to you." };
@@ -286,10 +298,12 @@ export async function respondToSwapRequest(swapRequestId: string, accept: boolea
     });
 
     return { ok: true } as const;
-  }).then((result) => {
+  }).then(async (result) => {
     if (result.ok) {
       revalidatePath("/uta/schedule");
       revalidatePath("/notifications");
+      await broadcast(SCHEDULE_CHANNEL);
+      if (requesterId) await broadcast(notificationsChannel(requesterId));
     }
     return result;
   });

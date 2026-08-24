@@ -2,6 +2,8 @@ import { requireUser } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateUpcomingWeek } from "@/lib/weeks";
 import { PageHeader } from "@/components/app-shell/app-shell";
+import { LiveRefresh } from "@/components/live-refresh";
+import { SCHEDULE_CHANNEL } from "@/lib/realtime";
 import { ScheduleGrid } from "./schedule-grid";
 import { SwapRequestsPanel, type PendingSwapRequest } from "./swap-requests-panel";
 
@@ -57,7 +59,8 @@ export default async function SchedulePage() {
 
   return (
     <>
-      <PageHeader title="Your Office Hours Schedule" />
+      <LiveRefresh channel={SCHEDULE_CHANNEL} />
+      <PageHeader title="Your Office Hours Schedule" live />
       <p className="mb-6 text-sm text-text-muted">
         Week of {week.weekStartDate.toLocaleDateString()}.
       </p>
