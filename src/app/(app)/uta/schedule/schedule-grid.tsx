@@ -1,0 +1,470 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import {
+  assignTaToShift,
+  cancelOpenSwapPost,
+  claimOpenSwapShift,
+  createShift,
+  deleteShift,
+  postToOpenSwapPool,
+  removeAssignment,
+  requestSwap,
+  toggleLead,
+} from "./actions";
+import {
+  DAY_LABELS,
+  GRID_END_HOUR,
+  GRID_START_HOUR,
+  OPERATING_DAYS,
+  formatHour,
+  isOperatingHour,
+  type DayOfWeek,
+} from "@/lib/operating-hours";
+
+export type ShiftData = {
+  id: string;
+  dayOfWeek: number;
+  startTime: string;
+  minTas: number;
+  maxTas: number;
+  assignments: { id: string; isLead: boolean; openForSwap: boolean; user: { id: string; name: string } }[];
+};
+
+export type TaOption = { id: string; name: string };
+export type AvailabilityWindowData = { dayOfWeek: number; startHour: number; endHour: number };
+
+function keyOf(day: number, hour: number) {
+  return `${day}:${hour}`;
+}
+
+export function ScheduleGrid({
+  shifts,
+  allTas,
+  currentUserId,
+  isProfessor,
+  myAvailability,
+}: {
+  shifts: ShiftData[];
+  allTas: TaOption[];
+  currentUserId: string;
+  isProfessor: boolean;
+  myAvailability: AvailabilityWindowData[];
+}) {
+  const shiftsByKey = useMemo(() => {
+    const map = new Map<string, ShiftData>();
+    for (const shift of shifts) {
+      const [hour] = shift.startTime.split(":").map(Number);
+      map.set(keyOf(shift.dayOfWeek, hour), shift);
+    }
+    return map;
+  }, [shifts]);
+
+  function amAvailable(day: number, hour: number) {
+    return myAvailability.some((w) => w.dayOfWeek === day && w.startHour <= hour && hour < w.endHour);
+  }
+
+  const [selected, setSelected] = useState<{ day: number; hour: number } | null>(null);
+
+  const hours = useMemo(() => {
+    const arr: number[] = [];
+    for (let h = GRID_START_HOUR; h < GRID_END_HOUR; h++) arr.push(h);
+    return arr;
+  }, []);
+
+  const selectedShift = selected ? shiftsByKey.get(keyOf(selected.day, selected.hour)) : undefined;
+
+  return (
+    <div>
+      <div
+        className="inline-grid select-none gap-px rounded-lg border border-border bg-border"
+        style={{ gridTemplateColumns: `4rem repeat(${OPERATING_DAYS.length}, 7rem)` }}
+      >
+        <div className="bg-bg" />
+        {OPERATING_DAYS.map((day) => (
+          <div key={day} className="bg-bg px-2 py-2 text-center text-xs font-semibold text-text-muted">
+            {DAY_LABELS[day as DayOfWeek]}
+          </div>
+        ))}
+
+        {hours.map((hour) => (
+          <div key={hour} className="contents">
+            <div className="flex items-center justify-end bg-bg px-2 py-1.5 text-xs text-text-muted">
+              {formatHour(hour)}
+            </div>
+            {OPERATING_DAYS.map((day) => {
+              const inBounds = isOperatingHour(day as DayOfWeek, hour);
+              const shift = shiftsByKey.get(keyOf(day, hour));
+              const mine = shift?.assignments.find((a) => a.user.id === currentUserId);
+              const isSelected = selected?.day === day && selected.hour === hour;
+
+              const openToJoin =
+                inBounds &&
+                !!shift &&
+                !mine &&
+                shift.assignments.some((a) => a.openForSwap) &&
+                amAvailable(day, hour);
+              const eligibleToPost =
+                inBounds && !!shift && !!mine && !mine.openForSwap && shift.assignments.length > shift.minTas;
+
+              return (
+                <button
+                  key={keyOf(day, hour)}
+                  type="button"
+                  disabled={!inBounds}
+                  onClick={() => inBounds && setSelected({ day, hour })}
+                  aria-pressed={isSelected}
+                  aria-label={`${DAY_LABELS[day as DayOfWeek]} ${formatHour(hour)}`}
+                  className={
+                    "relative flex h-12 w-full flex-col items-center justify-center gap-0.5 px-1 text-[11px] leading-tight transition-colors " +
+                    (!inBounds
+                      ? "cursor-not-allowed bg-bg-input/40"
+                      : isSelected
+                        ? "bg-bg-pill-active"
+                        : openToJoin
+                          ? "bg-accent/10 hover:bg-accent/20"
+                          : shift
+                            ? "bg-bg-input hover:bg-bg-pill-hover"
+                            : "bg-bg hover:bg-bg-pill-hover") +
+                    (mine ? " ring-2 ring-inset ring-accent" : "")
+                  }
+                >
+                  {(openToJoin || eligibleToPost) && (
+                    <span
+                      className={
+                        "absolute right-1 top-1 h-1.5 w-1.5 rounded-full " +
+                        (openToJoin ? "bg-accent" : "bg-text-muted")
+                      }
+                    />
+                  )}
+                  {shift ? (
+                    <>
+                      <span className="font-medium text-text">
+                        {shift.assignments.length}/{shift.maxTas}
+                      </span>
+                      {shift.assignments.length < shift.minTas && (
+                        <span className="text-danger">low</span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-text-muted">—</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-4 text-xs text-text-muted">
+        Your own shifts are outlined. An accent dot means you could join or claim that shift; a muted
+        dot on your own shift means you could post it for swap. Click any cell for the roster
+        {isProfessor ? " and to create or assign shifts" : ""}.
+      </p>
+
+      <div className="mt-6">
+        {selected ? (
+          <CellDetail
+            day={selected.day}
+            hour={selected.hour}
+            shift={selectedShift}
+            allTas={allTas}
+            isProfessor={isProfessor}
+            currentUserId={currentUserId}
+            amAvailable={amAvailable(selected.day, selected.hour)}
+            shifts={shifts}
+          />
+        ) : (
+          <p className="text-sm text-text-muted">Click a cell to see who&apos;s scheduled.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CellDetail({
+  day,
+  hour,
+  shift,
+  allTas,
+  isProfessor,
+  currentUserId,
+  amAvailable,
+  shifts,
+}: {
+  day: number;
+  hour: number;
+  shift: ShiftData | undefined;
+  allTas: TaOption[];
+  isProfessor: boolean;
+  currentUserId: string;
+  amAvailable: boolean;
+  shifts: ShiftData[];
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [minTas, setMinTas] = useState(3);
+  const [maxTas, setMaxTas] = useState(7);
+  const [pickedTa, setPickedTa] = useState("");
+  const [pickedTeammate, setPickedTeammate] = useState("");
+  const [pickedTheirShift, setPickedTheirShift] = useState("");
+
+  const label = `${DAY_LABELS[day as DayOfWeek]} ${formatHour(hour)}–${formatHour(hour + 1)}`;
+  const unassigned = allTas.filter((ta) => !shift?.assignments.some((a) => a.user.id === ta.id));
+  const mine = shift?.assignments.find((a) => a.user.id === currentUserId);
+
+  const teammateOptions = allTas.filter(
+    (ta) => ta.id !== currentUserId && !shift?.assignments.some((a) => a.user.id === ta.id),
+  );
+  const teammateShifts = shifts.filter(
+    (s) => s.id !== shift?.id && s.assignments.some((a) => a.user.id === pickedTeammate),
+  );
+
+  function run(action: () => Promise<{ ok: boolean; error?: string }>) {
+    setError(null);
+    startTransition(async () => {
+      const result = await action();
+      if (!result.ok) setError(result.error ?? "Something went wrong.");
+    });
+  }
+
+  return (
+    <div className="panel-card max-w-md p-4">
+      <p className="mb-3 font-medium">{label}</p>
+
+      {!shift ? (
+        isProfessor ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-text-muted">No shift here yet.</p>
+            <div className="flex items-end gap-3">
+              <label className="flex flex-col gap-1 text-xs text-text-muted">
+                Min TAs
+                <input
+                  type="number"
+                  min={1}
+                  value={minTas}
+                  onChange={(e) => setMinTas(Number(e.target.value))}
+                  className="field-input w-20"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-text-muted">
+                Max TAs
+                <input
+                  type="number"
+                  min={1}
+                  value={maxTas}
+                  onChange={(e) => setMaxTas(Number(e.target.value))}
+                  className="field-input w-20"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => run(() => createShift(day, hour, minTas, maxTas))}
+                className="pill-button"
+              >
+                Create shift
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-text-muted">No office hours scheduled here yet.</p>
+        )
+      ) : (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-text-muted">
+            {shift.assignments.length}/{shift.maxTas} TAs (min {shift.minTas})
+          </p>
+
+          {shift.assignments.length === 0 ? (
+            <p className="text-sm text-text-muted">Nobody assigned yet.</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {shift.assignments.map((a) => (
+                <li key={a.id} className="flex items-center justify-between gap-2 text-sm">
+                  <span>
+                    {a.user.name}
+                    {a.isLead && (
+                      <span className="ml-2 rounded-full bg-bg-pill-active px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-text-muted">
+                        Lead
+                      </span>
+                    )}
+                    {a.openForSwap && (
+                      <span className="ml-2 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
+                        Open for swap
+                      </span>
+                    )}
+                  </span>
+                  {isProfessor && (
+                    <span className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => run(() => toggleLead(shift.id, a.user.id, !a.isLead))}
+                        className="text-xs text-text-muted underline hover:text-text"
+                      >
+                        {a.isLead ? "Unmark lead" : "Make lead"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => run(() => removeAssignment(shift.id, a.user.id))}
+                        className="text-xs text-danger underline"
+                      >
+                        Remove
+                      </button>
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {isProfessor && (
+            <div className="flex items-center gap-2 border-t border-border pt-3">
+              <select
+                value={pickedTa}
+                onChange={(e) => setPickedTa(e.target.value)}
+                className="field-input flex-1"
+              >
+                <option value="">Assign a TA…</option>
+                {unassigned.map((ta) => (
+                  <option key={ta.id} value={ta.id}>
+                    {ta.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={isPending || !pickedTa}
+                onClick={() => {
+                  const userId = pickedTa;
+                  setPickedTa("");
+                  run(() => assignTaToShift(shift.id, userId));
+                }}
+                className="pill-button"
+              >
+                Assign
+              </button>
+            </div>
+          )}
+
+          {isProfessor && shift.assignments.length === 0 && (
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => run(() => deleteShift(shift.id))}
+              className="self-start text-xs text-danger underline"
+            >
+              Delete this shift
+            </button>
+          )}
+
+          {/* --- Swap flows (§7/§5) --- */}
+          {mine ? (
+            <div className="flex flex-col gap-3 border-t border-border pt-3">
+              {mine.openForSwap ? (
+                <div className="flex items-center gap-3">
+                  <p className="text-sm text-text-muted">You&apos;ve posted this to the open-swap pool.</p>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => run(() => cancelOpenSwapPost(shift.id))}
+                    className="pill-button-outline"
+                  >
+                    Cancel post
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={isPending || shift.assignments.length <= shift.minTas}
+                  onClick={() => run(() => postToOpenSwapPool(shift.id))}
+                  className="pill-button-outline self-start"
+                  title={
+                    shift.assignments.length <= shift.minTas
+                      ? `Removing you would drop below the minimum of ${shift.minTas}`
+                      : undefined
+                  }
+                >
+                  Post to open swap pool
+                </button>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-medium">Request a swap with a teammate</p>
+                <select
+                  value={pickedTeammate}
+                  onChange={(e) => {
+                    setPickedTeammate(e.target.value);
+                    setPickedTheirShift("");
+                  }}
+                  className="field-input"
+                >
+                  <option value="">Pick a teammate…</option>
+                  {teammateOptions.map((ta) => (
+                    <option key={ta.id} value={ta.id}>
+                      {ta.name}
+                    </option>
+                  ))}
+                </select>
+                {pickedTeammate && (
+                  <select
+                    value={pickedTheirShift}
+                    onChange={(e) => setPickedTheirShift(e.target.value)}
+                    className="field-input"
+                  >
+                    <option value="">(Optional) take one of their shifts in exchange…</option>
+                    {teammateShifts.map((s) => {
+                      const [h] = s.startTime.split(":").map(Number);
+                      return (
+                        <option key={s.id} value={s.id}>
+                          {DAY_LABELS[s.dayOfWeek as DayOfWeek]} {formatHour(h)}–{formatHour(h + 1)}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+                <button
+                  type="button"
+                  disabled={isPending || !pickedTeammate}
+                  onClick={() => {
+                    const teammate = pickedTeammate;
+                    const theirShift = pickedTheirShift || null;
+                    setPickedTeammate("");
+                    setPickedTheirShift("");
+                    run(() => requestSwap(shift.id, teammate, theirShift));
+                  }}
+                  className="pill-button self-start"
+                >
+                  Send request
+                </button>
+              </div>
+            </div>
+          ) : (
+            shift.assignments.some((a) => a.openForSwap) && (
+              <div className="border-t border-border pt-3">
+                {amAvailable ? (
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => run(() => claimOpenSwapShift(shift.id))}
+                    className="pill-button"
+                  >
+                    Claim this shift
+                  </button>
+                ) : (
+                  <p className="text-xs text-text-muted">
+                    Open for swap, but you&apos;re not marked available for this hour.
+                  </p>
+                )}
+              </div>
+            )
+          )}
+        </div>
+      )}
+
+      {error && <p className="mt-3 text-sm text-danger">{error}</p>}
+    </div>
+  );
+}
