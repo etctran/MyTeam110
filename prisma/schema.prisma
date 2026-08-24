@@ -1,0 +1,140 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+//
+// Data model transcribed from ta_scheduler_spec.md §3.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  PROFESSOR
+  UTA
+}
+
+enum TaType {
+  FIVE_HOUR // 4 hrs of office hours/week
+  TEN_HOUR // 8 hrs of office hours/week
+}
+
+enum SwapStatus {
+  PENDING
+  ACCEPTED
+  DENIED
+  CANCELLED
+}
+
+model User {
+  id          String    @id @default(cuid())
+  name        String
+  email       String    @unique
+  role        Role
+  taType      TaType?
+  isSenior    Boolean   @default(false) // eligible to be a shift lead
+  hireDate    DateTime?
+  weeklyQuota Int? // computed from taType, or overridden
+  createdAt   DateTime  @default(now())
+
+  availability     Availability[]
+  assignments      ShiftAssignment[]
+  lectureHelpDone  LectureHelpSignup[]
+  sentSwaps        SwapRequest[]       @relation("Requester")
+  receivedSwaps    SwapRequest[]       @relation("Target")
+  notifications    Notification[]
+}
+
+model Availability {
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id])
+  dayOfWeek Int // 0=Sun ... 6=Sat
+  startTime String // "11:00"
+  endTime   String // "19:00"
+}
+
+model Week {
+  id            String    @id @default(cuid())
+  weekStartDate DateTime  @unique
+  generatedAt   DateTime?
+  status        String // DRAFT | PUBLISHED
+  shifts        Shift[]
+  lectureHelpSlots LectureHelpSlot[]
+}
+
+model Shift {
+  id        String   @id @default(cuid())
+  weekId    String
+  week      Week     @relation(fields: [weekId], references: [id])
+  dayOfWeek Int
+  startTime String // "11:00"
+  endTime   String // "12:00" — shifts are 1-hour blocks
+  minTas    Int      @default(3)
+  maxTas    Int      @default(7)
+
+  assignments ShiftAssignment[]
+}
+
+model ShiftAssignment {
+  id          String  @id @default(cuid())
+  shiftId     String
+  shift       Shift   @relation(fields: [shiftId], references: [id])
+  userId      String
+  user        User    @relation(fields: [userId], references: [id])
+  isLead      Boolean @default(false)
+  openForSwap Boolean @default(false) // posted to the open-swap pool
+
+  @@unique([shiftId, userId])
+}
+
+model SwapRequest {
+  id          String     @id @default(cuid())
+  requesterId String
+  requester   User       @relation("Requester", fields: [requesterId], references: [id])
+  targetId    String? // null = open swap (anyone can claim)
+  target      User?      @relation("Target", fields: [targetId], references: [id])
+  fromShiftId String // the shift the requester wants to give up
+  toShiftId   String? // the shift they want in exchange (null if just dropping)
+  status      SwapStatus @default(PENDING)
+  createdAt   DateTime   @default(now())
+  resolvedAt  DateTime?
+}
+
+model LectureHelpSlot {
+  id         String   @id @default(cuid())
+  weekId     String
+  week       Week     @relation(fields: [weekId], references: [id])
+  courseInfo String // e.g. "CS 201 — Mon 10:00 lecture"
+  dayOfWeek  Int
+  startTime  String
+  endTime    String
+  capacity   Int      @default(1) // how many TAs can help this lecture
+
+  signups LectureHelpSignup[]
+}
+
+model LectureHelpSignup {
+  id     String          @id @default(cuid())
+  slotId String
+  slot   LectureHelpSlot @relation(fields: [slotId], references: [id])
+  userId String
+  user   User            @relation(fields: [userId], references: [id])
+  hours  Int // duration of the slot, cached here for quota math
+
+  @@unique([slotId, userId])
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  type          String // "SWAP_REQUEST" | "SWAP_ACCEPTED" | "SWAP_DENIED" | "ALL_HANDS_REMINDER" | "SCHEDULE_PUBLISHED"
+  message       String
+  relatedSwapId String?
+  read          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
