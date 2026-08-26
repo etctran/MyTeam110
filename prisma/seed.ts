@@ -15,7 +15,9 @@ import { PrismaClient, type Role, type TaType } from "../src/generated/prisma/cl
 import { PrismaPg } from "@prisma/adapter-pg";
 import { createAdminClient } from "../src/lib/supabase/admin";
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+// DIRECT_URL (session pooler / direct connection) when set — see
+// prisma.config.ts — falls back to DATABASE_URL for local dev.
+const adapter = new PrismaPg({ connectionString: process.env.DIRECT_URL ?? process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 const supabaseAdmin = createAdminClient();
 

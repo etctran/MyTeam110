@@ -14,6 +14,11 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Migrations/seed need a session-level connection (advisory locks,
+    // prepared statements) — Supabase's transaction-mode pooler doesn't
+    // support that and hangs instead of erroring. DIRECT_URL (session
+    // pooler / direct connection) is only set for hosted Supabase; local
+    // dev has one plain Postgres and falls back to DATABASE_URL.
+    url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
   },
 });
