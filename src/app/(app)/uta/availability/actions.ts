@@ -25,7 +25,7 @@ function toContiguousRuns(hours: number[]): Array<[number, number]> {
  * Replaces the current user's entire Availability set with the given
  * selection. Each selected day's hours are collapsed into contiguous
  * windows — one Availability row per run — so every row this produces is
- * already the single-contiguous-block unit the scheduling algorithm (§6)
+ * already the single-contiguous-block unit the scheduling algorithm
  * assumes.
  */
 export async function saveAvailability(cells: AvailabilityCell[]) {

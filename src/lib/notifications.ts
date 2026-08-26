@@ -20,8 +20,8 @@ const SUBJECT_BY_TYPE: Record<NotificationType, string> = {
 
 /**
  * Thin wrapper so every notification created across the app carries a
- * typed `type` (§3's Notification.type is a free-form string in the
- * schema) and, when configured, an email alongside the in-app one.
+ * typed `type` (Notification.type is a free-form string in the schema)
+ * and, when configured, an email alongside the in-app one.
  *
  * The email send is deliberately fire-and-forget on the non-transactional
  * `prisma` client, not `tx` — holding a DB transaction open for a network

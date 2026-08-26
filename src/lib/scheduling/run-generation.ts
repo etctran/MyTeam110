@@ -8,14 +8,14 @@ import { broadcast, notificationsChannel, SCHEDULE_CHANNEL } from "@/lib/realtim
 
 /**
  * The DB-touching half of "Generate": pulls real availability/quota data,
- * runs the standalone Phase 6 algorithm, and persists the result — shared
- * by the professor's "Generate schedule" button (Phase 7) and the Thursday
- * 5pm cron job (Phase 9, §8), since both need to do exactly the same
- * thing, just triggered differently and authorized differently.
+ * runs the standalone scheduling algorithm, and persists the result —
+ * shared by the professor's "Generate schedule" button and the Thursday
+ * 5pm cron job, since both need to do exactly the same thing, just
+ * triggered differently and authorized differently.
  *
  * `excludeProfessorId` skips notifying whoever just clicked the button
  * themselves; the cron job (no acting user) omits it, so every professor
- * gets the "ready for review" notification per §8.
+ * gets the "ready for review" notification.
  */
 export async function runScheduleGeneration(excludeProfessorId?: string) {
   const week = await getOrCreateUpcomingWeek();

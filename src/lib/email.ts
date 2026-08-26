@@ -2,10 +2,10 @@ import "server-only";
 import { Resend } from "resend";
 
 /**
- * Optional (§1: "Resend (phase 2) — email notifications on top of in-app
- * notifications"). No-ops entirely until both RESEND_API_KEY and
- * RESEND_FROM_EMAIL are set — this repo works fully without them, since
- * every notification already exists in-app regardless.
+ * Optional email layer on top of in-app notifications. No-ops entirely
+ * until both RESEND_API_KEY and RESEND_FROM_EMAIL are set — this repo
+ * works fully without them, since every notification already exists
+ * in-app regardless.
  */
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 

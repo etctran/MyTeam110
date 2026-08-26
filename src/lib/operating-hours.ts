@@ -1,6 +1,6 @@
 /**
- * Operating hours — §4. Kept as a constants file (not hardcoded in the UI)
- * so a professor could move this to a config table later without touching
+ * Operating hours. Kept as a constants file (not hardcoded in the UI) so
+ * a professor could move this to a config table later without touching
  * any component that imports it.
  *
  * dayOfWeek: 0=Sun ... 6=Sat, matching the Availability model. Saturday has
@@ -29,10 +29,10 @@ export const OPERATING_HOURS: Record<DayOfWeek, { start: number; end: number }> 
   5: { start: 11, end: 17 }, // Fri
 };
 
-// All-hands — §4: "Thursday 17:00–18:00 (recurring reminder, not a
-// schedulable slot)". Thursday's own operating window already ends at
-// 17:00 (above), so this never overlaps a real office-hours cell — it's
-// purely informational (the banner in app-shell.tsx).
+// All-hands: recurring reminder, not a schedulable slot. Thursday's own
+// operating window already ends at 17:00 (above), so this never overlaps
+// a real office-hours cell — it's purely informational (the banner in
+// app-shell.tsx).
 export const ALL_HANDS_DAY_OF_WEEK: DayOfWeek = 4;
 export const ALL_HANDS_HOURS = { start: 17, end: 18 };
 

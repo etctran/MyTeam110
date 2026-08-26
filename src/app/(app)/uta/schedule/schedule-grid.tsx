@@ -100,8 +100,8 @@ export function ScheduleGrid({
               const mine = shift?.assignments.find((a) => a.user.id === currentUserId);
               const isSelected = selected?.day === day && selected.hour === hour;
 
-              // §5 visual signals: headcount alone decides eligibility, no
-              // "posted" step — matches moveToOpenShift's actual gate.
+              // Headcount alone decides eligibility, no "posted" step —
+              // matches moveToOpenShift's actual gate.
               const openToJoin =
                 inBounds &&
                 !!shift &&
@@ -398,7 +398,7 @@ function CellDetail({
             </button>
           )}
 
-          {/* --- Swap flows (§7/§5) --- */}
+          {/* --- Swap flows --- */}
           {mine ? (
             <div className="flex flex-col gap-3 border-t border-border pt-3">
               <div className="flex flex-col gap-2">

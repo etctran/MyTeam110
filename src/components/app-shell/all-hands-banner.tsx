@@ -2,11 +2,10 @@ import { Megaphone } from "lucide-react";
 import { ALL_HANDS_DAY_OF_WEEK, ALL_HANDS_HOURS, formatHour } from "@/lib/operating-hours";
 
 /**
- * §8: "All-hands reminder: simple recurring notification job, or just a
- * persistent banner on the dashboard every Thursday — doesn't need its
- * own DB automation, can be a client-side computed reminder." Computed
- * server-side instead (same effect, no client JS needed) — this renders
- * fresh on every request, so "today" is always accurate.
+ * A persistent banner reminding everyone about the Thursday all-hands —
+ * no DB automation needed, just a computed reminder. Computed
+ * server-side (no client JS needed) — this renders fresh on every
+ * request, so "today" is always accurate.
  */
 export function AllHandsBanner() {
   if (new Date().getDay() !== ALL_HANDS_DAY_OF_WEEK) return null;

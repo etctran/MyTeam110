@@ -1,4 +1,4 @@
--- §8: Thursday 5:00 PM cron job that triggers /api/schedule/generate.
+-- Thursday 5:00 PM cron job that triggers /api/schedule/generate.
 --
 -- The route authenticates via a shared secret (CRON_SECRET), not a
 -- Supabase session — pg_cron has no user to log in as. That secret must

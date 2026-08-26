@@ -1,18 +1,17 @@
 /**
- * Auto-scheduling algorithm — §6, contiguous-block greedy (MVP).
+ * Auto-scheduling algorithm — contiguous-block greedy.
  *
- * A pure, DB-free function per the Build Order (§9 Phase 6: "implement...
- * as a standalone function, unit-test it... before wiring to UI"). It
- * operates entirely on plain data in and plain data out; persisting the
- * result as Week/Shift/ShiftAssignment rows is a later wiring step.
+ * A pure, DB-free function: it operates entirely on plain data in and
+ * plain data out. `run-generation.ts` handles pulling real data in and
+ * persisting the result as Week/Shift/ShiftAssignment rows.
  *
- * Key rule (verbatim from §6): a TA's assigned hours on a given day must
- * always be one unbroken block — never scattered hours with a gap. Every
- * mutation below is written to preserve that invariant, including one
- * refinement beyond the pseudocode: if a User has two separate
- * Availability windows on the same day, Pass 1 only ever assigns the
- * first one it reaches for that user. Assigning both would necessarily
- * leave a gap between them, which the key rule forbids outright.
+ * Key rule: a TA's assigned hours on a given day must always be one
+ * unbroken block — never scattered hours with a gap. Every mutation
+ * below is written to preserve that invariant, including one
+ * refinement: if a User has two separate Availability windows on the
+ * same day, Pass 1 only ever assigns the first one it reaches for that
+ * user. Assigning both would necessarily leave a gap between them,
+ * which the key rule forbids outright.
  */
 import { OPERATING_DAYS, OPERATING_HOURS } from "@/lib/operating-hours";
 import { computeEffectiveQuota } from "@/lib/scheduling/quota";

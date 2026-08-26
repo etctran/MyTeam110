@@ -55,8 +55,8 @@ export default async function proxy(request: NextRequest) {
     const role = user.app_metadata?.role as "PROFESSOR" | "UTA" | undefined;
 
     // UTAs can't reach professor-only routes. Professors *can* reach the
-    // UTA routes (per §5, their nav includes the same tabs read/write
-    // across everyone's data), so there's no symmetric block.
+    // UTA routes (their nav includes the same tabs, read/write across
+    // everyone's data), so there's no symmetric block.
     if (path.startsWith("/professor") && role !== "PROFESSOR") {
       return NextResponse.redirect(new URL("/uta", request.url));
     }
@@ -74,7 +74,7 @@ export default async function proxy(request: NextRequest) {
 
 export const config = {
   // Excludes /api entirely — route handlers there (e.g. the cron-triggered
-  // /api/schedule/generate, §8/§9) authenticate themselves via a shared
-  // secret, not a Supabase session, and have no session to redirect on.
+  // /api/schedule/generate) authenticate themselves via a shared secret,
+  // not a Supabase session, and have no session to redirect on.
   matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.png$).*)"],
 };

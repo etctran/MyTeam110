@@ -1,12 +1,13 @@
 /**
- * Seeds the local DB with a handful of test users per §9 build order:
- * a couple professors, a mix of 5-hour/10-hour TAs, a few marked senior.
+ * Seeds the DB with a handful of test users: a couple professors, a mix
+ * of 5-hour/10-hour TAs, a few marked senior.
  *
  * For each user this creates BOTH a Supabase Auth user (so you can log
- * in) and the matching Prisma `User` row (joined by email) — see the
- * Phase 1–2 design note on why role lives in Supabase `app_metadata`.
+ * in) and the matching Prisma `User` row (joined by email) — role lives
+ * in Supabase `app_metadata`, not the Prisma row, since role gates
+ * proxy.ts's redirects before any DB round-trip.
  *
- * Run with: pnpm db:seed
+ * Run with: pnpm db:seed. Reversible with pnpm db:unseed.
  */
 import { config as loadEnv } from "dotenv";
 loadEnv({ path: ".env.local" });
@@ -32,7 +33,7 @@ type SeedUser = {
   weeklyQuota?: number;
 };
 
-// FIVE_HOUR = 4 hrs/week, TEN_HOUR = 8 hrs/week, per §3.
+// FIVE_HOUR = 4 hrs/week, TEN_HOUR = 8 hrs/week.
 const QUOTA_BY_TA_TYPE: Record<TaType, number> = {
   FIVE_HOUR: 4,
   TEN_HOUR: 8,

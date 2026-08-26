@@ -10,11 +10,8 @@ import { broadcast, notificationsChannel, SCHEDULE_CHANNEL } from "@/lib/realtim
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
-/**
- * Manual shift creation/assignment for Phase 5 — no auto-generation yet.
- * Every action here is professor-only per the Build Order's Phase 5 scope;
- * TAs get write access to their own schedule via the swap flows (Phase 8).
- */
+// Manual shift creation/assignment — professor-only. TAs get write access
+// to their own schedule via the swap flows below instead.
 
 export async function createShift(day: number, hour: number, minTas: number, maxTas: number): Promise<ActionResult> {
   await requireRole("PROFESSOR");
@@ -98,8 +95,8 @@ export async function toggleLead(shiftId: string, userId: string, isLead: boolea
 }
 
 /**
- * Swap flows — §7. Two distinct mechanisms, matching the two "Claim"/
- * "Request" buttons described in §5's cell panel:
+ * Swap flows — two distinct mechanisms, matching the two "Claim"/"Request"
+ * buttons in the cell detail panel:
  *
  *  - Self-move (moveToOpenShift): a TA can move themselves from a shift
  *    they're on with room to spare (headcount > minTas) directly into any

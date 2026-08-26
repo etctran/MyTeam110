@@ -7,8 +7,8 @@ export type NavItem = {
   icon: LucideIcon;
 };
 
-// The 3 shared tabs from §5 — visible to both roles, since professors read
-///manage the same data UTAs see. "Dashboard" is appended for professors only.
+// The 3 shared tabs — visible to both roles, since professors read/manage
+// the same data UTAs see. "Dashboard" is appended for professors only.
 export const SHARED_NAV_ITEMS: NavItem[] = [
   { label: "Your Availability", href: "/uta/availability", icon: CalendarClock },
   { label: "Your Office Hours Schedule", href: "/uta/schedule", icon: CalendarRange },

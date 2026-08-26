@@ -7,12 +7,12 @@ import { runScheduleGeneration } from "@/lib/scheduling/run-generation";
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
 /**
- * Wires the standalone Phase 6 algorithm to real data and persists the
- * result. Re-running this replaces every Shift/ShiftAssignment for the
- * upcoming week — Generate is the primary path; Phase 5's manual editor
- * is there for filling gaps afterward, not for edits meant to survive a
- * regenerate. The same underlying generation also runs unattended via the
- * Thursday 5pm cron job (§8) — see /api/schedule/generate.
+ * Wires the scheduling algorithm to real data and persists the result.
+ * Re-running this replaces every Shift/ShiftAssignment for the upcoming
+ * week — Generate is the primary path; the manual editor is there for
+ * filling gaps afterward, not for edits meant to survive a regenerate.
+ * The same underlying generation also runs unattended via the Thursday
+ * 5pm cron job — see /api/schedule/generate.
  */
 export async function generateWeekSchedule(): Promise<ActionResult> {
   const professor = await requireRole("PROFESSOR");
