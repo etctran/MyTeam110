@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { computeEffectiveQuota } from "@/lib/scheduling/quota";
 import { groupLectureHelpSections } from "@/lib/lecture-help";
 import { PageHeader } from "@/components/app-shell/app-shell";
+import { LectureHelpForm } from "./lecture-help-form";
 import { LectureHelpTable } from "./lecture-help-table";
 
 export default async function LectureHelpPage() {
@@ -39,6 +40,15 @@ export default async function LectureHelpPage() {
           <span className="font-medium text-text">{user.weeklyQuota}h</span> down to{" "}
           <span className="font-medium text-text">{effectiveQuota}h</span>.
         </p>
+      )}
+
+      {user.role === "PROFESSOR" && (
+        <div className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">
+            Add a section
+          </h2>
+          <LectureHelpForm />
+        </div>
       )}
 
       <LectureHelpTable

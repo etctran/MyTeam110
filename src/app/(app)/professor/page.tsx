@@ -2,12 +2,9 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateUpcomingWeek } from "@/lib/weeks";
-import { groupLectureHelpSections } from "@/lib/lecture-help";
 import { PageHeader } from "@/components/app-shell/app-shell";
 import { DAY_LABELS, formatHour } from "@/lib/operating-hours";
 import { AlertTriangle } from "lucide-react";
-import { LectureHelpForm } from "./lecture-help-form";
-import { LectureHelpTable } from "@/app/(app)/uta/lecture-help/lecture-help-table";
 import { GenerateButton } from "./generate-button";
 import { AnnouncementForm } from "./announcement-form";
 
@@ -15,25 +12,13 @@ export default async function ProfessorPage() {
   const user = await requireRole("PROFESSOR");
   const week = await getOrCreateUpcomingWeek();
 
-  const [lectureHelpSlots, allTas, shifts] = await Promise.all([
-    prisma.lectureHelpSlot.findMany({
-      orderBy: [{ courseInfo: "asc" }, { dayOfWeek: "asc" }],
-      include: { signups: { include: { user: { select: { id: true, name: true } } } } },
-    }),
-    prisma.user.findMany({
-      where: { role: "UTA" },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
-    prisma.shift.findMany({
-      where: { weekId: week.id },
-      orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
-      include: { assignments: true },
-    }),
-  ]);
+  const shifts = await prisma.shift.findMany({
+    where: { weekId: week.id },
+    orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
+    include: { assignments: true },
+  });
 
   const needsAttention = shifts.filter((shift) => shift.assignments.length < shift.minTas);
-  const lectureHelpSections = groupLectureHelpSections(lectureHelpSlots);
 
   return (
     <>
@@ -96,21 +81,6 @@ export default async function ProfessorPage() {
           })}
         </div>
       )}
-
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">
-        Lecture help — fixed roster
-      </h2>
-
-      <div className="mb-6">
-        <LectureHelpForm />
-      </div>
-
-      <LectureHelpTable
-        sections={lectureHelpSections}
-        currentUserId={user.id}
-        isProfessor
-        allTas={allTas}
-      />
     </>
   );
 }
