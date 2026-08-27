@@ -54,7 +54,7 @@ async function seedUsers() {
         email: ta.email,
         role: "UTA",
         taType: ta.taType,
-        isSenior: ta.isSenior,
+        isReturning: ta.isReturning,
         weeklyQuota: ta.taType === "TEN_HOUR" ? 8 : 4,
       },
     });

@@ -35,7 +35,7 @@ model User {
   email       String    @unique
   role        Role
   taType      TaType?
-  isSenior    Boolean   @default(false) // eligible to be a shift lead
+  isReturning Boolean   @default(false) // returning TA — the only ones eligible to be a shift lead
   hireDate    DateTime?
   weeklyQuota Int? // computed from taType, or overridden
   createdAt   DateTime  @default(now())

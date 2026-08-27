@@ -16,9 +16,11 @@ import {
   GRID_START_HOUR,
   OPERATING_DAYS,
   formatHour,
+  formatTime,
   isOperatingHour,
   type DayOfWeek,
 } from "@/lib/operating-hours";
+import { hasShiftStarted } from "@/lib/shift-time";
 
 export type ShiftData = {
   id: string;
@@ -26,7 +28,7 @@ export type ShiftData = {
   startTime: string;
   minTas: number;
   maxTas: number;
-  assignments: { id: string; isLead: boolean; user: { id: string; name: string } }[];
+  assignments: { id: string; isLead: boolean; user: { id: string; name: string; isReturning: boolean } }[];
 };
 
 export type TaOption = { id: string; name: string };
@@ -46,13 +48,19 @@ export function ScheduleGrid({
   currentUserId,
   isProfessor,
   myAvailability,
+  weekStartDate,
 }: {
   shifts: ShiftData[];
   allTas: TaOption[];
   currentUserId: string;
   isProfessor: boolean;
   myAvailability: AvailabilityWindowData[];
+  weekStartDate: Date;
 }) {
+  function hasPassed(day: number, hour: number) {
+    return hasShiftStarted(weekStartDate, day, formatTime(hour));
+  }
+
   const shiftsByKey = useMemo(() => {
     const map = new Map<string, ShiftData>();
     for (const shift of shifts) {
@@ -101,14 +109,18 @@ export function ScheduleGrid({
               const isSelected = selected?.day === day && selected.hour === hour;
 
               // Headcount alone decides eligibility, no "posted" step —
-              // matches moveToOpenShift's actual gate.
+              // matches moveToOpenShift's actual gate. Once a shift has
+              // started, none of this applies any more either.
+              const passed = hasPassed(day, hour);
               const openToJoin =
                 inBounds &&
                 !!shift &&
                 !mine &&
+                !passed &&
                 shift.assignments.length < shift.maxTas &&
                 amAvailable(day, hour);
-              const eligibleToMove = inBounds && !!shift && !!mine && shift.assignments.length > shift.minTas;
+              const eligibleToMove =
+                inBounds && !!shift && !!mine && !passed && shift.assignments.length > shift.minTas;
 
               return (
                 <button
@@ -153,10 +165,15 @@ export function ScheduleGrid({
                           key={a.id}
                           className={
                             "w-full truncate text-left " +
-                            (a.user.id === currentUserId ? "text-text" : "text-text-muted")
+                            (a.isLead
+                              ? "font-semibold text-accent"
+                              : a.user.id === currentUserId
+                                ? "text-text"
+                                : "text-text-muted")
                           }
                         >
                           {firstName(a.user.name)}
+                          {a.isLead && " ★"}
                         </span>
                       ))}
                     </>
@@ -187,6 +204,7 @@ export function ScheduleGrid({
             currentUserId={currentUserId}
             shifts={shifts}
             myAvailability={myAvailability}
+            weekStartDate={weekStartDate}
           />
         ) : (
           <p className="text-sm text-text-muted">Click a cell to see who&apos;s scheduled.</p>
@@ -205,6 +223,7 @@ function CellDetail({
   currentUserId,
   shifts,
   myAvailability,
+  weekStartDate,
 }: {
   day: number;
   hour: number;
@@ -214,7 +233,9 @@ function CellDetail({
   currentUserId: string;
   shifts: ShiftData[];
   myAvailability: AvailabilityWindowData[];
+  weekStartDate: Date;
 }) {
+  const shiftHasPassed = !!shift && hasShiftStarted(weekStartDate, day, shift.startTime);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [minTas, setMinTas] = useState(3);
@@ -334,14 +355,16 @@ function CellDetail({
                   </span>
                   {isProfessor && (
                     <span className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={isPending}
-                        onClick={() => run(() => toggleLead(shift.id, a.user.id, !a.isLead))}
-                        className="text-xs text-text-muted underline hover:text-text"
-                      >
-                        {a.isLead ? "Unmark lead" : "Make lead"}
-                      </button>
+                      {(a.isLead || a.user.isReturning) && (
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => run(() => toggleLead(shift.id, a.user.id, !a.isLead))}
+                          className="text-xs text-text-muted underline hover:text-text"
+                        >
+                          {a.isLead ? "Unmark lead" : "Make lead"}
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={isPending}
@@ -399,7 +422,11 @@ function CellDetail({
           )}
 
           {/* --- Swap flows --- */}
-          {mine ? (
+          {shiftHasPassed ? (
+            <p className="border-t border-border pt-3 text-xs text-text-muted">
+              This shift has already happened — it can no longer be changed.
+            </p>
+          ) : mine ? (
             <div className="flex flex-col gap-3 border-t border-border pt-3">
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-medium">Move to another shift</p>

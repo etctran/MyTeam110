@@ -27,7 +27,7 @@ export type SchedulingUser = {
   id: string;
   weeklyQuota: number;
   lectureHelpHours: number;
-  isSenior: boolean;
+  isReturning: boolean;
 };
 
 export type GeneratedShift = {
@@ -36,6 +36,7 @@ export type GeneratedShift = {
   assignedUserIds: string[];
   leadUserId: string | null;
   needsAttention: boolean;
+  needsLead: boolean;
 };
 
 export type GenerateScheduleOptions = {
@@ -59,10 +60,10 @@ export function generateSchedule(
   const maxTas = options.maxTas ?? 6;
 
   const remainingQuota = new Map<string, number>();
-  const isSenior = new Map<string, boolean>();
+  const isReturning = new Map<string, boolean>();
   for (const user of users) {
     remainingQuota.set(user.id, computeEffectiveQuota(user.weeklyQuota, user.lectureHelpHours));
-    isSenior.set(user.id, user.isSenior);
+    isReturning.set(user.id, user.isReturning);
   }
 
   const availabilityByDay = new Map<number, AvailabilityWindow[]>();
@@ -93,6 +94,34 @@ export function generateSchedule(
     return dayHourAssignments.get(day)?.get(hour)?.size ?? 0;
   }
 
+  /** Shared by Pass 2's fill-to-minimum and Pass 2b's ensure-a-lead step:
+   * who's actually eligible to be added at this hour without breaking a
+   * block (available, has quota left, and — if they already have a block
+   * today — only extends one of its edges, never opens a gap). */
+  function eligibleAt(day: number, hour: number, windows: AvailabilityWindow[], onlyReturning: boolean) {
+    const blocks = dayBlocks.get(day)!;
+    return users.filter((u) => {
+      if (onlyReturning && !isReturning.get(u.id)) return false;
+      if ((remainingQuota.get(u.id) ?? 0) <= 0) return false;
+      const covered = windows.some((w) => w.userId === u.id && w.startHour <= hour && hour < w.endHour);
+      if (!covered) return false;
+      const block = blocks.get(u.id);
+      if (!block) return true; // fresh single-hour block
+      return block.end === hour || block.start === hour + 1; // extend an edge only, never a gap
+    });
+  }
+
+  function addAssignment(day: number, hour: number, userId: string) {
+    const blocks = dayBlocks.get(day)!;
+    const block = blocks.get(userId);
+    if (!block) blocks.set(userId, { start: hour, end: hour + 1 });
+    else if (block.end === hour) block.end = hour + 1;
+    else if (block.start === hour + 1) block.start = hour;
+
+    dayHourAssignments.get(day)!.get(hour)!.add(userId);
+    remainingQuota.set(userId, (remainingQuota.get(userId) ?? 0) - 1);
+  }
+
   for (const day of operatingDays) {
     ensureDay(day);
     const blocks = dayBlocks.get(day)!;
@@ -120,35 +149,36 @@ export function generateSchedule(
       remainingQuota.set(window.userId, quota - sessionLength);
     }
 
-    // ---- Pass 2: hourly headcount pass ----
     const { start: dayStart, end: dayEnd } = hoursOf(day);
+
+    // ---- Pass 2: hourly headcount pass ----
     for (let hour = dayStart; hour < dayEnd; hour++) {
       let count = countAt(day, hour);
 
       if (count < minTas) {
-        const candidates = users
-          .filter((u) => {
-            if ((remainingQuota.get(u.id) ?? 0) <= 0) return false;
-            const covered = windows.some(
-              (w) => w.userId === u.id && w.startHour <= hour && hour < w.endHour,
-            );
-            if (!covered) return false;
-            const block = blocks.get(u.id);
-            if (!block) return true; // fresh single-hour block
-            return block.end === hour || block.start === hour + 1; // extend an edge only, never a gap
-          })
-          .sort((a, b) => (remainingQuota.get(b.id) ?? 0) - (remainingQuota.get(a.id) ?? 0));
+        const candidates = eligibleAt(day, hour, windows, false).sort(
+          (a, b) => (remainingQuota.get(b.id) ?? 0) - (remainingQuota.get(a.id) ?? 0),
+        );
 
         for (const candidate of candidates) {
           if (count >= minTas) break;
+          addAssignment(day, hour, candidate.id);
+          count += 1;
+        }
+      }
 
-          const block = blocks.get(candidate.id);
-          if (!block) blocks.set(candidate.id, { start: hour, end: hour + 1 });
-          else if (block.end === hour) block.end = hour + 1;
-          else if (block.start === hour + 1) block.start = hour;
-
-          dayHourAssignments.get(day)!.get(hour)!.add(candidate.id);
-          remainingQuota.set(candidate.id, (remainingQuota.get(candidate.id) ?? 0) - 1);
+      // ---- Pass 2b: ensure a returning TA (lead candidate) is on every
+      // shift, if any is actually available for it — added on top of the
+      // minimum fill above, using spare room under maxTas. Can't invent
+      // one out of thin air: if nobody returning has availability this
+      // hour, the shift is simply flagged needsLead later instead. ----
+      const hasReturning = [...dayHourAssignments.get(day)!.get(hour)!].some((id) => isReturning.get(id));
+      if (!hasReturning && count < maxTas) {
+        const [candidate] = eligibleAt(day, hour, windows, true).sort(
+          (a, b) => (remainingQuota.get(b.id) ?? 0) - (remainingQuota.get(a.id) ?? 0),
+        );
+        if (candidate) {
+          addAssignment(day, hour, candidate.id);
           count += 1;
         }
       }
@@ -159,26 +189,46 @@ export function generateSchedule(
           .filter(({ block }) => block.start === hour || block.end - 1 === hour) // edge hour only
           .sort((a, b) => (remainingQuota.get(a.id) ?? 0) - (remainingQuota.get(b.id) ?? 0)); // most slack (least remaining need) first
 
-        let idx = 0;
-        while (count > maxTas && idx < trimCandidates.length) {
-          const { id, block } = trimCandidates[idx];
-          idx += 1;
-
+        function trimOne(id: string, block: Block) {
           dayHourAssignments.get(day)!.get(hour)!.delete(id);
           remainingQuota.set(id, (remainingQuota.get(id) ?? 0) + 1);
           count -= 1;
-
           if (block.start === hour) block.start += 1;
           else if (block.end - 1 === hour) block.end -= 1;
           if (block.start >= block.end) blocks.delete(id);
+        }
+
+        let returningCountAtHour = [...dayHourAssignments.get(day)!.get(hour)!].filter((id) =>
+          isReturning.get(id),
+        ).length;
+
+        // First pass: trim everyone except the shift's last returning TA —
+        // removing them would silently undo Pass 2b's whole point.
+        for (const { id, block } of trimCandidates) {
+          if (count <= maxTas) break;
+          if (isReturning.get(id) && returningCountAtHour <= 1) continue;
+          trimOne(id, block);
+          if (isReturning.get(id)) returningCountAtHour -= 1;
+        }
+
+        // Fallback: if protecting that last returning TA left us still over
+        // maxTas (only possible if every remaining edge-hour person *is*
+        // that one TA, i.e. nobody else was left to trim), the headcount
+        // cap wins — trim them too rather than silently exceed maxTas.
+        if (count > maxTas) {
+          for (const { id, block } of trimCandidates) {
+            if (count <= maxTas) break;
+            if (!dayHourAssignments.get(day)!.get(hour)!.has(id)) continue; // already trimmed above
+            trimOne(id, block);
+          }
         }
       }
     }
   }
 
-  // ---- Pass 3: leads (round-robin among assigned seniors) + needs-attention ----
-  const seniorRotation = users
-    .filter((u) => u.isSenior)
+  // ---- Pass 3: leads (round-robin among assigned returning TAs) + flags ----
+  const returningRotation = users
+    .filter((u) => u.isReturning)
     .map((u) => u.id)
     .sort();
   let rotationIndex = 0;
@@ -188,15 +238,15 @@ export function generateSchedule(
     const { start, end } = hoursOf(day);
     for (let hour = start; hour < end; hour++) {
       const assignedUserIds = [...(dayHourAssignments.get(day)?.get(hour) ?? [])].sort();
-      const assignedSeniors = assignedUserIds.filter((id) => isSenior.get(id));
+      const assignedReturning = assignedUserIds.filter((id) => isReturning.get(id));
 
       let leadUserId: string | null = null;
-      for (let i = 0; i < seniorRotation.length && assignedSeniors.length > 0; i++) {
-        const candidateIndex = (rotationIndex + i) % seniorRotation.length;
-        const candidateId = seniorRotation[candidateIndex];
-        if (assignedSeniors.includes(candidateId)) {
+      for (let i = 0; i < returningRotation.length && assignedReturning.length > 0; i++) {
+        const candidateIndex = (rotationIndex + i) % returningRotation.length;
+        const candidateId = returningRotation[candidateIndex];
+        if (assignedReturning.includes(candidateId)) {
           leadUserId = candidateId;
-          rotationIndex = (candidateIndex + 1) % seniorRotation.length;
+          rotationIndex = (candidateIndex + 1) % returningRotation.length;
           break;
         }
       }
@@ -207,6 +257,7 @@ export function generateSchedule(
         assignedUserIds,
         leadUserId,
         needsAttention: assignedUserIds.length < minTas,
+        needsLead: leadUserId === null,
       });
     }
   }

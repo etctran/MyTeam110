@@ -29,7 +29,7 @@ type SeedUser = {
   email: string;
   role: Role;
   taType?: TaType;
-  isSenior?: boolean;
+  isReturning?: boolean;
   weeklyQuota?: number;
 };
 
@@ -43,12 +43,12 @@ const SEED_USERS: SeedUser[] = [
   { name: "Priya Nair", email: "prof1@test.dev", role: "PROFESSOR" },
   { name: "David Kim", email: "prof2@test.dev", role: "PROFESSOR" },
 
-  { name: "Alex Chen", email: "ta1@test.dev", role: "UTA", taType: "FIVE_HOUR", isSenior: false },
-  { name: "Jordan Lee", email: "ta2@test.dev", role: "UTA", taType: "FIVE_HOUR", isSenior: false },
-  { name: "Sam Ortiz", email: "ta3@test.dev", role: "UTA", taType: "FIVE_HOUR", isSenior: true },
-  { name: "Morgan Patel", email: "ta4@test.dev", role: "UTA", taType: "TEN_HOUR", isSenior: false },
-  { name: "Taylor Brooks", email: "ta5@test.dev", role: "UTA", taType: "TEN_HOUR", isSenior: true },
-  { name: "Riley Zhang", email: "ta6@test.dev", role: "UTA", taType: "TEN_HOUR", isSenior: true },
+  { name: "Alex Chen", email: "ta1@test.dev", role: "UTA", taType: "FIVE_HOUR", isReturning: false },
+  { name: "Jordan Lee", email: "ta2@test.dev", role: "UTA", taType: "FIVE_HOUR", isReturning: false },
+  { name: "Sam Ortiz", email: "ta3@test.dev", role: "UTA", taType: "FIVE_HOUR", isReturning: true },
+  { name: "Morgan Patel", email: "ta4@test.dev", role: "UTA", taType: "TEN_HOUR", isReturning: false },
+  { name: "Taylor Brooks", email: "ta5@test.dev", role: "UTA", taType: "TEN_HOUR", isReturning: true },
+  { name: "Riley Zhang", email: "ta6@test.dev", role: "UTA", taType: "TEN_HOUR", isReturning: true },
 ];
 
 async function findAuthUserByEmail(email: string) {
@@ -92,7 +92,7 @@ async function main() {
         name: seedUser.name,
         role: seedUser.role,
         taType: seedUser.taType ?? null,
-        isSenior: seedUser.isSenior ?? false,
+        isReturning: seedUser.isReturning ?? false,
         weeklyQuota,
       },
       create: {
@@ -100,7 +100,7 @@ async function main() {
         email: seedUser.email,
         role: seedUser.role,
         taType: seedUser.taType ?? null,
-        isSenior: seedUser.isSenior ?? false,
+        isReturning: seedUser.isReturning ?? false,
         weeklyQuota,
         hireDate: new Date(),
       },

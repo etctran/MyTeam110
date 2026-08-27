@@ -23,7 +23,7 @@ export async function runScheduleGeneration(excludeProfessorId?: string) {
   const [tas, availabilityRows, signups, professors] = await Promise.all([
     prisma.user.findMany({
       where: { role: "UTA" },
-      select: { id: true, weeklyQuota: true, isSenior: true },
+      select: { id: true, weeklyQuota: true, isReturning: true },
     }),
     prisma.availability.findMany(),
     // Lecture help is a standing roster now, not tied to a Week — every
@@ -46,7 +46,7 @@ export async function runScheduleGeneration(excludeProfessorId?: string) {
     id: ta.id,
     weeklyQuota: ta.weeklyQuota ?? 0,
     lectureHelpHours: lectureHelpHoursByUser.get(ta.id) ?? 0,
-    isSenior: ta.isSenior,
+    isReturning: ta.isReturning,
   }));
 
   const availability: AvailabilityWindow[] = availabilityRows.map((row) => ({
@@ -58,6 +58,7 @@ export async function runScheduleGeneration(excludeProfessorId?: string) {
 
   const generated = generateSchedule(schedulingUsers, availability);
   const needsAttentionCount = generated.filter((s) => s.needsAttention).length;
+  const needsLeadCount = generated.filter((s) => s.needsLead).length;
 
   await prisma.$transaction(async (tx) => {
     const existingShifts = await tx.shift.findMany({ where: { weekId: week.id }, select: { id: true } });
@@ -92,15 +93,23 @@ export async function runScheduleGeneration(excludeProfessorId?: string) {
 
     await tx.week.update({ where: { id: week.id }, data: { generatedAt: new Date() } });
 
+    const flags: string[] = [];
+    if (needsAttentionCount > 0) {
+      flags.push(`${needsAttentionCount} shift${needsAttentionCount === 1 ? "" : "s"} need attention`);
+    }
+    if (needsLeadCount > 0) {
+      flags.push(`${needsLeadCount} shift${needsLeadCount === 1 ? "" : "s"} missing a lead`);
+    }
+
     for (const professor of professors) {
       if (professor.id === excludeProfessorId) continue;
       await notify(tx, {
         userId: professor.id,
         type: "SCHEDULE_PUBLISHED",
         message:
-          needsAttentionCount > 0
-            ? `Schedule generated for the week of ${week.weekStartDate.toLocaleDateString()} — ${needsAttentionCount} shift${needsAttentionCount === 1 ? "" : "s"} need attention.`
-            : `Schedule generated for the week of ${week.weekStartDate.toLocaleDateString()} — every shift meets its minimum.`,
+          flags.length > 0
+            ? `Schedule generated for the week of ${week.weekStartDate.toLocaleDateString()} — ${flags.join(", ")}.`
+            : `Schedule generated for the week of ${week.weekStartDate.toLocaleDateString()} — every shift meets its minimum and has a lead.`,
       });
     }
   });
@@ -112,5 +121,5 @@ export async function runScheduleGeneration(excludeProfessorId?: string) {
       .map((p) => broadcast(notificationsChannel(p.id))),
   );
 
-  return { weekStartDate: week.weekStartDate, shiftCount: generated.length, needsAttentionCount };
+  return { weekStartDate: week.weekStartDate, shiftCount: generated.length, needsAttentionCount, needsLeadCount };
 }

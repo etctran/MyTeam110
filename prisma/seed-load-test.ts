@@ -1,6 +1,6 @@
 /**
  * One-off: adds ~40 extra TAs with randomized, quota-appropriate
- * availability (a mix of FIVE_HOUR/TEN_HOUR, some senior), then runs
+ * availability (a mix of FIVE_HOUR/TEN_HOUR, some returning), then runs
  * the real schedule-generation algorithm — the same code path the
  * professor's "Generate schedule" button calls — so you can see it
  * operate at realistic scale.
@@ -118,26 +118,26 @@ async function main() {
     const email = `loadtest-${String(i).padStart(2, "0")}@test.dev`;
     const name = nameFor(i - 1);
     const taType: TaType = rand() < 0.5 ? "FIVE_HOUR" : "TEN_HOUR";
-    const isSenior = rand() < 0.25;
+    const isReturning = rand() < 0.25;
     const weeklyQuota = taType === "FIVE_HOUR" ? 4 : 8;
 
     await upsertAuthUser(email);
     const user = await prisma.user.upsert({
       where: { email },
-      update: { name, taType, isSenior, weeklyQuota },
+      update: { name, taType, isReturning, weeklyQuota },
       create: {
         name,
         email,
         role: "UTA",
         taType,
-        isSenior,
+        isReturning,
         weeklyQuota,
         hireDate: new Date(),
       },
     });
 
     await layDownAvailability(user.id, weeklyQuota, taType);
-    console.log(`  ${name.padEnd(16)} ${email}  ${taType.padEnd(9)}  senior=${isSenior}`);
+    console.log(`  ${name.padEnd(16)} ${email}  ${taType.padEnd(9)}  returning=${isReturning}`);
   }
 
   console.log(`\nTriggering schedule generation via ${APP_URL}/api/schedule/generate...`);
@@ -154,7 +154,9 @@ async function main() {
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-    console.log(`Done: ${body.shiftCount} shifts, ${body.needsAttentionCount} need attention.`);
+    console.log(
+      `Done: ${body.shiftCount} shifts, ${body.needsAttentionCount} need attention, ${body.needsLeadCount} missing a lead.`,
+    );
   } catch (err) {
     console.log(
       `Couldn't reach the dev server (${err instanceof Error ? err.message : err}). ` +

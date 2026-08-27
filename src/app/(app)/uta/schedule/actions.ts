@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole, requireUser } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateUpcomingWeek } from "@/lib/weeks";
+import { hasShiftStarted } from "@/lib/shift-time";
 import { formatTime } from "@/lib/operating-hours";
 import { notify } from "@/lib/notifications";
 import { broadcast, notificationsChannel, SCHEDULE_CHANNEL } from "@/lib/realtime";
@@ -83,12 +84,37 @@ export async function removeAssignment(shiftId: string, userId: string): Promise
   return { ok: true };
 }
 
+/**
+ * Only a returning TA can be a shift's lead, and a shift has at most one —
+ * marking someone lead here unmarks anyone else on the same shift in the
+ * same transaction, rather than relying on the UI to only ever toggle one
+ * at a time.
+ */
 export async function toggleLead(shiftId: string, userId: string, isLead: boolean): Promise<ActionResult> {
   await requireRole("PROFESSOR");
-  await prisma.shiftAssignment.update({
-    where: { shiftId_userId: { shiftId, userId } },
-    data: { isLead },
-  });
+
+  if (isLead) {
+    const target = await prisma.user.findUnique({ where: { id: userId }, select: { isReturning: true } });
+    if (!target?.isReturning) {
+      return { ok: false, error: "Only a returning TA can be the shift lead." };
+    }
+  }
+
+  await prisma.$transaction([
+    ...(isLead
+      ? [
+          prisma.shiftAssignment.updateMany({
+            where: { shiftId, isLead: true, userId: { not: userId } },
+            data: { isLead: false },
+          }),
+        ]
+      : []),
+    prisma.shiftAssignment.update({
+      where: { shiftId_userId: { shiftId, userId } },
+      data: { isLead },
+    }),
+  ]);
+
   revalidatePath("/uta/schedule");
   await broadcast(SCHEDULE_CHANNEL);
   return { ok: true };
@@ -122,9 +148,16 @@ export async function moveToOpenShift(fromShiftId: string, toShiftId: string): P
     await tx.$queryRaw`SELECT id FROM "Shift" WHERE id IN (${firstId}, ${secondId}) FOR UPDATE`;
 
     const [fromShift, toShift] = await Promise.all([
-      tx.shift.findUniqueOrThrow({ where: { id: fromShiftId }, include: { assignments: true } }),
-      tx.shift.findUniqueOrThrow({ where: { id: toShiftId }, include: { assignments: true } }),
+      tx.shift.findUniqueOrThrow({ where: { id: fromShiftId }, include: { assignments: true, week: true } }),
+      tx.shift.findUniqueOrThrow({ where: { id: toShiftId }, include: { assignments: true, week: true } }),
     ]);
+
+    if (hasShiftStarted(fromShift.week.weekStartDate, fromShift.dayOfWeek, fromShift.startTime)) {
+      return { ok: false, error: "That shift has already happened." };
+    }
+    if (hasShiftStarted(toShift.week.weekStartDate, toShift.dayOfWeek, toShift.startTime)) {
+      return { ok: false, error: "That shift has already happened." };
+    }
 
     const mine = fromShift.assignments.find((a) => a.userId === user.id);
     if (!mine) return { ok: false, error: "You're not assigned to that shift." };
@@ -176,11 +209,21 @@ export async function requestSwap(
   });
   if (!fromAssignment) return { ok: false, error: "That's not your shift." };
 
+  const fromShift = await prisma.shift.findUniqueOrThrow({ where: { id: fromShiftId }, include: { week: true } });
+  if (hasShiftStarted(fromShift.week.weekStartDate, fromShift.dayOfWeek, fromShift.startTime)) {
+    return { ok: false, error: "That shift has already happened." };
+  }
+
   if (toShiftId) {
     const targetAssignment = await prisma.shiftAssignment.findUnique({
       where: { shiftId_userId: { shiftId: toShiftId, userId: targetUserId } },
     });
     if (!targetAssignment) return { ok: false, error: "That teammate isn't on the shift you picked." };
+
+    const toShift = await prisma.shift.findUniqueOrThrow({ where: { id: toShiftId }, include: { week: true } });
+    if (hasShiftStarted(toShift.week.weekStartDate, toShift.dayOfWeek, toShift.startTime)) {
+      return { ok: false, error: "That shift has already happened." };
+    }
   }
 
   const [requester, target] = await Promise.all([
@@ -247,7 +290,7 @@ export async function respondToSwapRequest(swapRequestId: string, accept: boolea
       return { ok: true } as const;
     }
 
-    const [fromAssignment, toAssignment] = await Promise.all([
+    const [fromAssignment, toAssignment, fromShift, toShift] = await Promise.all([
       tx.shiftAssignment.findUnique({
         where: { shiftId_userId: { shiftId: swapRequest.fromShiftId, userId: swapRequest.requesterId } },
       }),
@@ -256,7 +299,20 @@ export async function respondToSwapRequest(swapRequestId: string, accept: boolea
             where: { shiftId_userId: { shiftId: swapRequest.toShiftId, userId: user.id } },
           })
         : Promise.resolve(null),
+      tx.shift.findUniqueOrThrow({ where: { id: swapRequest.fromShiftId }, include: { week: true } }),
+      swapRequest.toShiftId
+        ? tx.shift.findUniqueOrThrow({ where: { id: swapRequest.toShiftId }, include: { week: true } })
+        : Promise.resolve(null),
     ]);
+
+    // Re-checked here, not just at request time — time may have passed
+    // between the request and this response.
+    if (hasShiftStarted(fromShift.week.weekStartDate, fromShift.dayOfWeek, fromShift.startTime)) {
+      return { ok: false, error: "That shift has already happened." };
+    }
+    if (toShift && hasShiftStarted(toShift.week.weekStartDate, toShift.dayOfWeek, toShift.startTime)) {
+      return { ok: false, error: "That shift has already happened." };
+    }
 
     if (!fromAssignment) {
       return { ok: false, error: "The requester is no longer on that shift." };

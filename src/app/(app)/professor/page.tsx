@@ -18,7 +18,11 @@ export default async function ProfessorPage() {
     include: { assignments: true },
   });
 
-  const needsAttention = shifts.filter((shift) => shift.assignments.length < shift.minTas);
+  const needsAttention = shifts.filter(
+    (shift) =>
+      shift.assignments.length < shift.minTas ||
+      (shift.assignments.length > 0 && !shift.assignments.some((a) => a.isLead)),
+  );
 
   return (
     <>
@@ -63,6 +67,8 @@ export default async function ProfessorPage() {
             const [hour] = shift.startTime.split(":").map(Number);
             const dayLabel =
               DAY_LABELS[shift.dayOfWeek as keyof typeof DAY_LABELS] ?? `Day ${shift.dayOfWeek}`;
+            const understaffed = shift.assignments.length < shift.minTas;
+            const missingLead = shift.assignments.length > 0 && !shift.assignments.some((a) => a.isLead);
             return (
               <Link
                 key={shift.id}
@@ -74,7 +80,9 @@ export default async function ProfessorPage() {
                   {dayLabel} {formatHour(hour)}–{formatHour(hour + 1)}
                 </span>
                 <span className="text-text-muted">
-                  {shift.assignments.length}/{shift.minTas} min TAs
+                  {understaffed && `${shift.assignments.length}/${shift.minTas} min TAs`}
+                  {understaffed && missingLead && " · "}
+                  {missingLead && "no lead"}
                 </span>
               </Link>
             );

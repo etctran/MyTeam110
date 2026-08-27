@@ -34,7 +34,7 @@ export function AddTaForm() {
         />
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-1.5 text-sm text-text-muted">
-            <input type="checkbox" name="isSenior" /> Senior
+            <input type="checkbox" name="isReturning" /> Returning
           </label>
           <button type="submit" disabled={pending} className="pill-button">
             {pending ? "Adding…" : "Add TA"}

@@ -11,7 +11,7 @@ export const E2E_PASSWORD = "e2e-test-password-123";
 
 export const E2E_USERS = {
   professor: { email: "e2e-prof@e2e.test", name: "E2E Professor" },
-  ta1: { email: "e2e-ta1@e2e.test", name: "E2E TaOne", taType: "FIVE_HOUR" as const, isSenior: false },
-  ta2: { email: "e2e-ta2@e2e.test", name: "E2E TaTwo", taType: "TEN_HOUR" as const, isSenior: true },
-  ta3: { email: "e2e-ta3@e2e.test", name: "E2E TaThree", taType: "FIVE_HOUR" as const, isSenior: false },
+  ta1: { email: "e2e-ta1@e2e.test", name: "E2E TaOne", taType: "FIVE_HOUR" as const, isReturning: false },
+  ta2: { email: "e2e-ta2@e2e.test", name: "E2E TaTwo", taType: "TEN_HOUR" as const, isReturning: true },
+  ta3: { email: "e2e-ta3@e2e.test", name: "E2E TaThree", taType: "FIVE_HOUR" as const, isReturning: false },
 };

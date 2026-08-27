@@ -19,7 +19,7 @@ export default async function ProfilePage() {
         <p className="text-sm text-text-muted">
           {user.email} · {user.role}
           {user.taType ? ` · ${user.taType}` : ""}
-          {user.isSenior ? " · senior" : ""}
+          {user.isReturning ? " · returning" : ""}
         </p>
       </div>
 
@@ -120,7 +120,7 @@ async function TeamData({ weekId }: { weekId: string }) {
     prisma.user.findMany({
       where: { role: "UTA" },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, email: true, taType: true, isSenior: true, weeklyQuota: true },
+      select: { id: true, name: true, email: true, taType: true, isReturning: true, weeklyQuota: true },
     }),
     prisma.shiftAssignment.groupBy({
       by: ["userId"],
@@ -143,7 +143,7 @@ async function TeamData({ weekId }: { weekId: string }) {
       name: ta.name,
       email: ta.email,
       taType: ta.taType,
-      isSenior: ta.isSenior,
+      isReturning: ta.isReturning,
       weeklyQuota: ta.weeklyQuota,
       hoursAssigned: hoursMap.get(ta.id) ?? 0,
       lectureHelpHours,

@@ -9,7 +9,7 @@ export type TeamRow = {
   name: string;
   email: string;
   taType: TaType | null;
-  isSenior: boolean;
+  isReturning: boolean;
   weeklyQuota: number | null;
   hoursAssigned: number;
   lectureHelpHours: number;
@@ -60,7 +60,7 @@ export function TeamTable({ rows }: { rows: TeamRow[] }) {
                   </td>
                   <td className="px-3 py-2 text-text-muted">
                     {r.taType ?? "—"}
-                    {r.isSenior && " · senior"}
+                    {r.isReturning && " · returning"}
                   </td>
                   <td className="px-3 py-2">
                     {r.hoursAssigned}h / {r.weeklyQuota ?? "—"}h
@@ -99,7 +99,7 @@ function EditRow({ row, onDone }: { row: TeamRow; onDone: () => void }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [taType, setTaType] = useState<TaType | "">(row.taType ?? "");
-  const [isSenior, setIsSenior] = useState(row.isSenior);
+  const [isReturning, setIsReturning] = useState(row.isReturning);
   const [weeklyQuota, setWeeklyQuota] = useState(row.weeklyQuota?.toString() ?? "");
 
   function save() {
@@ -107,7 +107,7 @@ function EditRow({ row, onDone }: { row: TeamRow; onDone: () => void }) {
     startTransition(async () => {
       const result = await updateTa(row.id, {
         taType: taType === "" ? null : taType,
-        isSenior,
+        isReturning,
         weeklyQuota: weeklyQuota.trim() === "" ? null : Number(weeklyQuota),
       });
       if (!result.ok) setError(result.error);
@@ -136,8 +136,8 @@ function EditRow({ row, onDone }: { row: TeamRow; onDone: () => void }) {
           <option value="TEN_HOUR">10-hour</option>
         </select>
         <label className="flex items-center gap-1.5 text-xs text-text-muted">
-          <input type="checkbox" checked={isSenior} onChange={(e) => setIsSenior(e.target.checked)} />
-          Senior
+          <input type="checkbox" checked={isReturning} onChange={(e) => setIsReturning(e.target.checked)} />
+          Returning
         </label>
       </td>
       <td className="px-3 py-2">

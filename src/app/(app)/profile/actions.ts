@@ -26,7 +26,7 @@ export async function addTa(_prevState: AddTaResult | undefined, formData: FormD
   const name = formData.get("name");
   const email = formData.get("email");
   const taType = formData.get("taType");
-  const isSenior = formData.get("isSenior") === "on";
+  const isReturning = formData.get("isReturning") === "on";
   const quotaOverride = formData.get("weeklyQuota");
 
   if (typeof name !== "string" || !name.trim() || typeof email !== "string" || !email.trim()) {
@@ -67,7 +67,7 @@ export async function addTa(_prevState: AddTaResult | undefined, formData: FormD
         email: email.trim(),
         role: "UTA",
         taType: resolvedTaType,
-        isSenior,
+        isReturning,
         weeklyQuota,
         hireDate: new Date(),
       },
@@ -85,7 +85,7 @@ export async function addTa(_prevState: AddTaResult | undefined, formData: FormD
 
 export async function updateTa(
   userId: string,
-  updates: { taType: TaType | null; isSenior: boolean; weeklyQuota: number | null },
+  updates: { taType: TaType | null; isReturning: boolean; weeklyQuota: number | null },
 ): Promise<ActionResult> {
   await requireRole("PROFESSOR");
 
@@ -93,7 +93,7 @@ export async function updateTa(
     where: { id: userId },
     data: {
       taType: updates.taType,
-      isSenior: updates.isSenior,
+      isReturning: updates.isReturning,
       weeklyQuota: updates.weeklyQuota,
     },
   });
