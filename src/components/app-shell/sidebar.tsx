@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, LogOut, UserRound } from "lucide-react";
 import { logout } from "@/app/login/actions";
-import { PROFESSOR_NAV_ITEM, SHARED_NAV_ITEMS } from "@/lib/nav";
+import { AVAILABILITY_NAV_ITEM, PROFESSOR_NAV_ITEM, SHARED_NAV_ITEMS } from "@/lib/nav";
 import type { Role } from "@/generated/prisma/client";
 
 export function Sidebar({
@@ -17,7 +17,10 @@ export function Sidebar({
   unreadCount: number;
 }) {
   const pathname = usePathname();
-  const items = role === "PROFESSOR" ? [PROFESSOR_NAV_ITEM, ...SHARED_NAV_ITEMS] : SHARED_NAV_ITEMS;
+  const items =
+    role === "PROFESSOR"
+      ? [PROFESSOR_NAV_ITEM, ...SHARED_NAV_ITEMS]
+      : [AVAILABILITY_NAV_ITEM, ...SHARED_NAV_ITEMS];
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-bg-sidebar px-4 py-5">

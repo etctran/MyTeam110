@@ -8,7 +8,8 @@ export type NotificationType =
   | "SWAP_ACCEPTED"
   | "SWAP_DENIED"
   | "ALL_HANDS_REMINDER"
-  | "SCHEDULE_PUBLISHED";
+  | "SCHEDULE_PUBLISHED"
+  | "ANNOUNCEMENT";
 
 const SUBJECT_BY_TYPE: Record<NotificationType, string> = {
   SWAP_REQUEST: "New swap request",
@@ -16,6 +17,7 @@ const SUBJECT_BY_TYPE: Record<NotificationType, string> = {
   SWAP_DENIED: "Your swap was denied",
   ALL_HANDS_REMINDER: "All-hands reminder",
   SCHEDULE_PUBLISHED: "Schedule generated",
+  ANNOUNCEMENT: "Announcement from your professor",
 };
 
 /**

@@ -30,6 +30,9 @@ function toContiguousRuns(hours: number[]): Array<[number, number]> {
  */
 export async function saveAvailability(cells: AvailabilityCell[]) {
   const user = await requireUser();
+  if (user.role === "PROFESSOR") {
+    throw new Error("Professors don't submit availability.");
+  }
 
   const byDay = new Map<number, number[]>();
   for (const cell of cells) {

@@ -9,6 +9,7 @@ import { AlertTriangle } from "lucide-react";
 import { LectureHelpForm } from "./lecture-help-form";
 import { LectureHelpTable } from "@/app/(app)/uta/lecture-help/lecture-help-table";
 import { GenerateButton } from "./generate-button";
+import { AnnouncementForm } from "./announcement-form";
 
 export default async function ProfessorPage() {
   const user = await requireRole("PROFESSOR");
@@ -40,6 +41,13 @@ export default async function ProfessorPage() {
       <p className="mb-8 text-sm text-text-muted">
         Signed in as {user.name} ({user.email}).
       </p>
+
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">
+        Send an announcement
+      </h2>
+      <div className="mb-8">
+        <AnnouncementForm />
+      </div>
 
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">
         Generate — week of {week.weekStartDate.toLocaleDateString()}

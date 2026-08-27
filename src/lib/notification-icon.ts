@@ -6,5 +6,6 @@ export const NOTIFICATION_ICON: Record<string, LucideIcon> & { default: LucideIc
   SWAP_DENIED: XCircle,
   ALL_HANDS_REMINDER: Megaphone,
   SCHEDULE_PUBLISHED: CalendarCheck,
+  ANNOUNCEMENT: Megaphone,
   default: Megaphone,
 };
