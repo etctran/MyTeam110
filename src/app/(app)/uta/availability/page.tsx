@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/app-shell/app-shell";
+import { InlineLoading } from "@/components/app-shell/inline-loading";
 import { AvailabilityGrid } from "./availability-grid";
 import type { AvailabilityCell } from "./actions";
 
@@ -9,7 +11,18 @@ export default async function AvailabilityPage() {
   const user = await requireUser();
   if (user.role === "PROFESSOR") redirect("/professor"); // professors don't work office hours, nothing to submit here
 
-  const rows = await prisma.availability.findMany({ where: { userId: user.id } });
+  return (
+    <>
+      <PageHeader title="Your Availability" />
+      <Suspense fallback={<InlineLoading />}>
+        <AvailabilityContent userId={user.id} />
+      </Suspense>
+    </>
+  );
+}
+
+async function AvailabilityContent({ userId }: { userId: string }) {
+  const rows = await prisma.availability.findMany({ where: { userId } });
 
   const cells: AvailabilityCell[] = rows.flatMap((row) => {
     const start = Number(row.startTime.split(":")[0]);
@@ -19,10 +32,5 @@ export default async function AvailabilityPage() {
     return hours;
   });
 
-  return (
-    <>
-      <PageHeader title="Your Availability" />
-      <AvailabilityGrid initialCells={cells} />
-    </>
-  );
+  return <AvailabilityGrid initialCells={cells} />;
 }

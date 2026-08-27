@@ -1,14 +1,37 @@
+import { Suspense } from "react";
 import { requireUser } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { computeEffectiveQuota } from "@/lib/scheduling/quota";
 import { groupLectureHelpSections } from "@/lib/lecture-help";
 import { PageHeader } from "@/components/app-shell/app-shell";
+import { InlineLoading } from "@/components/app-shell/inline-loading";
 import { LectureHelpForm } from "./lecture-help-form";
 import { LectureHelpTable } from "./lecture-help-table";
 
 export default async function LectureHelpPage() {
   const user = await requireUser();
 
+  return (
+    <>
+      <PageHeader title="Lecture Help Schedule" />
+
+      {user.role === "PROFESSOR" && (
+        <div className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">
+            Add a section
+          </h2>
+          <LectureHelpForm />
+        </div>
+      )}
+
+      <Suspense fallback={<InlineLoading />}>
+        <LectureHelpContent user={user} />
+      </Suspense>
+    </>
+  );
+}
+
+async function LectureHelpContent({ user }: { user: Awaited<ReturnType<typeof requireUser>> }) {
   const [slots, allTas] = await Promise.all([
     prisma.lectureHelpSlot.findMany({
       orderBy: [{ courseInfo: "asc" }, { dayOfWeek: "asc" }],
@@ -31,8 +54,6 @@ export default async function LectureHelpPage() {
 
   return (
     <>
-      <PageHeader title="Lecture Help Schedule" />
-
       {user.weeklyQuota != null && (
         <p className="mb-6 text-sm text-text-muted">
           You&apos;re on <span className="font-medium text-text">{myAssignmentCount}</span> lecture-help
@@ -40,15 +61,6 @@ export default async function LectureHelpPage() {
           <span className="font-medium text-text">{user.weeklyQuota}h</span> down to{" "}
           <span className="font-medium text-text">{effectiveQuota}h</span>.
         </p>
-      )}
-
-      {user.role === "PROFESSOR" && (
-        <div className="mb-6">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">
-            Add a section
-          </h2>
-          <LectureHelpForm />
-        </div>
       )}
 
       <LectureHelpTable

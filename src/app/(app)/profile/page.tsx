@@ -1,15 +1,17 @@
+import { Suspense } from "react";
 import { requireUser } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateUpcomingWeek } from "@/lib/weeks";
 import { computeEffectiveQuota } from "@/lib/scheduling/quota";
 import { PageHeader } from "@/components/app-shell/app-shell";
+import { InlineLoading } from "@/components/app-shell/inline-loading";
 import { DAY_LABELS, formatHour, type DayOfWeek } from "@/lib/operating-hours";
+import type { Role } from "@/generated/prisma/client";
 import { TeamTable, type TeamRow } from "./team-table";
 import { AddTaForm } from "./add-ta-form";
 
 export default async function ProfilePage() {
   const user = await requireUser();
-  const week = await getOrCreateUpcomingWeek();
 
   return (
     <>
@@ -23,8 +25,31 @@ export default async function ProfilePage() {
         </p>
       </div>
 
-      {user.role === "PROFESSOR" ? <TeamData weekId={week.id} /> : <MyData userId={user.id} weekId={week.id} weeklyQuota={user.weeklyQuota} />}
+      <Suspense fallback={<InlineLoading />}>
+        <WeekScopedData
+          role={user.role}
+          userId={user.id}
+          weeklyQuota={user.weeklyQuota}
+        />
+      </Suspense>
     </>
+  );
+}
+
+async function WeekScopedData({
+  role,
+  userId,
+  weeklyQuota,
+}: {
+  role: Role;
+  userId: string;
+  weeklyQuota: number | null;
+}) {
+  const week = await getOrCreateUpcomingWeek();
+  return role === "PROFESSOR" ? (
+    <TeamData weekId={week.id} />
+  ) : (
+    <MyData userId={userId} weekId={week.id} weeklyQuota={weeklyQuota} />
   );
 }
 

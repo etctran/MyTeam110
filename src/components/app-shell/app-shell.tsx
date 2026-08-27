@@ -6,17 +6,17 @@ import { AllHandsBanner } from "./all-hands-banner";
 export function AppShell({
   name,
   role,
-  unreadCount,
+  unreadBadge,
   children,
 }: {
   name: string;
   role: Role;
-  unreadCount: number;
+  unreadBadge: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="flex min-h-screen">
-      <Sidebar name={name} role={role} unreadCount={unreadCount} />
+      <Sidebar name={name} role={role} unreadBadge={unreadBadge} />
       <main className="flex-1 overflow-x-auto px-10 py-8">
         <AllHandsBanner />
         {children}

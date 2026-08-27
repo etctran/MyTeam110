@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateUpcomingWeek } from "@/lib/weeks";
 import { PageHeader } from "@/components/app-shell/app-shell";
+import { InlineLoading } from "@/components/app-shell/inline-loading";
 import { DAY_LABELS, formatHour } from "@/lib/operating-hours";
 import { AlertTriangle } from "lucide-react";
 import { GenerateButton } from "./generate-button";
@@ -10,6 +12,32 @@ import { AnnouncementForm } from "./announcement-form";
 
 export default async function ProfessorPage() {
   const user = await requireRole("PROFESSOR");
+
+  return (
+    <>
+      <PageHeader title="Dashboard" />
+      <p className="mb-8 text-sm text-text-muted">
+        Signed in as {user.name} ({user.email}).
+      </p>
+
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">
+        Send an announcement
+      </h2>
+      <div className="mb-8">
+        <AnnouncementForm />
+      </div>
+
+      <Suspense fallback={<InlineLoading />}>
+        <ScheduleStatus />
+      </Suspense>
+    </>
+  );
+}
+
+// The only part of this page that needs the week + shift data — kept out
+// of the top-level await so the header/announcement form above render
+// immediately on every navigation instead of waiting on Prisma.
+async function ScheduleStatus() {
   const week = await getOrCreateUpcomingWeek();
 
   const shifts = await prisma.shift.findMany({
@@ -26,18 +54,6 @@ export default async function ProfessorPage() {
 
   return (
     <>
-      <PageHeader title="Dashboard" />
-      <p className="mb-8 text-sm text-text-muted">
-        Signed in as {user.name} ({user.email}).
-      </p>
-
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">
-        Send an announcement
-      </h2>
-      <div className="mb-8">
-        <AnnouncementForm />
-      </div>
-
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted">
         Generate — week of {week.weekStartDate.toLocaleDateString()}
       </h2>

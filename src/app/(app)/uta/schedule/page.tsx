@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import { requireUser } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateUpcomingWeek } from "@/lib/weeks";
 import { PageHeader } from "@/components/app-shell/app-shell";
+import { InlineLoading } from "@/components/app-shell/inline-loading";
 import { LiveRefresh } from "@/components/live-refresh";
 import { SCHEDULE_CHANNEL } from "@/lib/realtime";
 import { ScheduleGrid } from "./schedule-grid";
@@ -10,6 +12,18 @@ import { SwapRequestsPanel, type PendingSwapRequest } from "./swap-requests-pane
 export default async function SchedulePage() {
   const user = await requireUser();
 
+  return (
+    <>
+      <LiveRefresh channel={SCHEDULE_CHANNEL} />
+      <PageHeader title="Office Hours Schedule" live />
+      <Suspense fallback={<InlineLoading />}>
+        <ScheduleContent user={user} />
+      </Suspense>
+    </>
+  );
+}
+
+async function ScheduleContent({ user }: { user: Awaited<ReturnType<typeof requireUser>> }) {
   // Only `shifts` depends on `week.id` — kick off the other three
   // independent queries immediately instead of waiting on the week
   // upsert first, and chain `shifts` off `week` without blocking on
@@ -36,6 +50,7 @@ export default async function SchedulePage() {
     orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
     include: {
       assignments: {
+        orderBy: { isLead: "desc" }, // lead first, everyone else keeps insertion order after
         include: { user: { select: { id: true, name: true, isReturning: true } } },
       },
     },
@@ -71,8 +86,6 @@ export default async function SchedulePage() {
 
   return (
     <>
-      <LiveRefresh channel={SCHEDULE_CHANNEL} />
-      <PageHeader title="Office Hours Schedule" live />
       <p className="mb-6 text-sm text-text-muted">
         Week of {week.weekStartDate.toLocaleDateString()}.
       </p>

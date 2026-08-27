@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, LogOut, UserRound } from "lucide-react";
@@ -10,11 +11,11 @@ import type { Role } from "@/generated/prisma/client";
 export function Sidebar({
   name,
   role,
-  unreadCount,
+  unreadBadge,
 }: {
   name: string;
   role: Role;
-  unreadCount: number;
+  unreadBadge: ReactNode;
 }) {
   const pathname = usePathname();
   const items =
@@ -51,11 +52,7 @@ export function Sidebar({
           <Bell size={18} strokeWidth={2} />
           Notifications
         </span>
-        {unreadCount > 0 && (
-          <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-soft-text">
-            {unreadCount}
-          </span>
-        )}
+        {unreadBadge}
       </Link>
 
       <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
