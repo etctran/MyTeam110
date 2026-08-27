@@ -5,16 +5,19 @@ import "./lib/supabase/ws-polyfill";
 const PUBLIC_ROUTES = ["/login"];
 
 /**
- * Runs on (almost) every request. Two jobs:
+ * Runs on (almost) every request, including prefetched ones — Next's own
+ * docs are explicit that Proxy must stay to *optimistic* checks only
+ * (decode the session cookie, no network/DB round-trip), precisely
+ * because it runs this often. The authoritative check lives in the DAL
+ * (`requireUser`/`requireRole`, via `auth.getUser()`), which every page
+ * already calls before touching real data — Proxy is a cheap redirect
+ * hint layered in front of that, never a substitute for it.
  *
- * 1. Refresh the Supabase session cookie via `auth.getUser()`. This is
- *    Supabase's required SSR pattern (not just a Next.js "optimistic
- *    check") — it's how expired access tokens get silently refreshed
- *    using the refresh token before they expire.
- * 2. Cheap, optimistic role-based redirects using the role Supabase
- *    stores in the JWT's `app_metadata` (set at user-creation time) —
- *    no DB round-trip here. The authoritative check against the `User`
- *    table happens in the DAL (`requireRole`) on the actual page.
+ * `getSession()` (not `getUser()`) is deliberate here: it decodes the
+ * JWT already sitting in the cookie and only hits the network to refresh
+ * it if it's actually expired, rather than revalidating against Supabase
+ * Auth on every single request. `getUser()` is reserved for the DAL,
+ * where a forged/stale cookie actually matters.
  */
 export default async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -41,8 +44,9 @@ export default async function proxy(request: NextRequest) {
   );
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
 
   const path = request.nextUrl.pathname;
   const isPublicRoute = PUBLIC_ROUTES.includes(path);
