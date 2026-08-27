@@ -23,38 +23,63 @@ export default async function SchedulePage() {
   );
 }
 
+// TEMP diagnostic (systematic-debugging, see conversation): times each
+// concurrent query independently so we can see which one accounts for
+// the ~600-800ms delay that survived the pg-pool-size fix. Remove once
+// root-caused.
+const _timings: string[] = [];
+function timed<T>(label: string, p: Promise<T>): Promise<T> {
+  const t0 = Date.now();
+  return p.then((v) => {
+    _timings.push(`${label}=${Date.now() - t0}ms`);
+    return v;
+  });
+}
+
 async function ScheduleContent({ user }: { user: Awaited<ReturnType<typeof requireUser>> }) {
   // Only `shifts` depends on `week.id` — kick off the other three
   // independent queries immediately instead of waiting on the week
   // upsert first, and chain `shifts` off `week` without blocking on
   // them either. This hides the week round-trip behind the others
   // rather than paying for it as its own sequential leg.
-  const weekPromise = getOrCreateUpcomingWeek();
-  const allTasPromise = prisma.user.findMany({
-    where: { role: "UTA" },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
-  });
-  const myAvailabilityPromise = prisma.availability.findMany({ where: { userId: user.id } });
-  const pendingSwapPromise = prisma.swapRequest.findMany({
-    where: { targetId: user.id, status: "PENDING" },
-    include: {
-      requester: { select: { name: true } },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  const weekPromise = timed("week", getOrCreateUpcomingWeek());
+  const allTasPromise = timed(
+    "allTas",
+    prisma.user.findMany({
+      where: { role: "UTA" },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+  );
+  const myAvailabilityPromise = timed(
+    "myAvailability",
+    prisma.availability.findMany({ where: { userId: user.id } }),
+  );
+  const pendingSwapPromise = timed(
+    "pendingSwap",
+    prisma.swapRequest.findMany({
+      where: { targetId: user.id, status: "PENDING" },
+      include: {
+        requester: { select: { name: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+  );
 
   const week = await weekPromise;
-  const shiftsPromise = prisma.shift.findMany({
-    where: { weekId: week.id },
-    orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
-    include: {
-      assignments: {
-        orderBy: { isLead: "desc" }, // lead first, everyone else keeps insertion order after
-        include: { user: { select: { id: true, name: true, isReturning: true } } },
+  const shiftsPromise = timed(
+    "shifts",
+    prisma.shift.findMany({
+      where: { weekId: week.id },
+      orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
+      include: {
+        assignments: {
+          orderBy: { isLead: "desc" }, // lead first, everyone else keeps insertion order after
+          include: { user: { select: { id: true, name: true, isReturning: true } } },
+        },
       },
-    },
-  });
+    }),
+  );
 
   const [shifts, allTas, myAvailabilityRows, pendingSwapRequests] = await Promise.all([
     shiftsPromise,
@@ -86,6 +111,8 @@ async function ScheduleContent({ user }: { user: Awaited<ReturnType<typeof requi
 
   return (
     <>
+      {/* TEMP diagnostic, see conversation — remove with the `timed()` helper above */}
+      <p data-diag-timings={_timings.join(" ")} className="hidden" />
       <p className="mb-6 text-sm text-text-muted">
         Week of {week.weekStartDate.toLocaleDateString()}.
       </p>
