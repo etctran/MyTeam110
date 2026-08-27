@@ -15,11 +15,20 @@ const globalForPrisma = globalThis as unknown as {
 // small (often 1) since Supavisor multiplexes many small client pools
 // into a much smaller shared backend pool_size (~15-20 on smaller
 // tiers): https://supabase.com/docs/guides/troubleshooting/supavisor-faq-YyP5tI
-// We use 4, not 1, because page loads intentionally run several queries
+// We use 6, not 1, because page loads intentionally run several queries
 // concurrently via Promise.all — 1 would serialize those within a
-// single request. 4 covers our widest Promise.all batch while still
-// capping each container far below the previous unbounded default.
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL!, max: 4 });
+// single request. The widest actual batch is profile's MyData at 5
+// concurrent queries, *plus* one more from (app)/layout.tsx's own
+// UnreadBadge query — a sibling Suspense boundary that runs in parallel
+// with every page, not after it. 4 undercounted both: it was sized to
+// schedule's 4-query batch alone, missing the badge query stacking on
+// top of every page (5) and profile's true 5-wide batch (6). Measured
+// live: schedule/profile (5-6 concurrent, over the old cap of 4) showed
+// a consistent ~800ms connection-wait penalty on every navigation;
+// lecture-help/availability (3-2 concurrent, under the cap) never did.
+// 6 covers the real peak while still capping each container far below
+// the previous unbounded default of 10.
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL!, max: 6 });
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
 
