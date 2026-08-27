@@ -37,6 +37,12 @@ function timed<T>(label: string, p: Promise<T>): Promise<T> {
 }
 
 async function ScheduleContent({ user }: { user: Awaited<ReturnType<typeof requireUser>> }) {
+  // TEMP: module-level array persists across warm-container invocations,
+  // contaminating readings from earlier requests. Reset per-call so each
+  // response only shows its own timings.
+  _timings.length = 0;
+  const _reqId = Math.random().toString(36).slice(2, 6);
+  _timings.push(`req=${_reqId}`);
   // Only `shifts` depends on `week.id` — kick off the other three
   // independent queries immediately instead of waiting on the week
   // upsert first, and chain `shifts` off `week` without blocking on
