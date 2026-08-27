@@ -94,6 +94,9 @@ async function ScheduleContent({ user }: { user: Awaited<ReturnType<typeof requi
     pendingSwapPromise,
   ]);
 
+  _timings.push(
+    `counts:shifts=${shifts.length},assignments=${shifts.reduce((n, s) => n + s.assignments.length, 0)},allTas=${allTas.length},pendingSwap=${pendingSwapRequests.length}`,
+  );
   const shiftsById = new Map(shifts.map((s) => [s.id, s]));
   const pendingRequests: PendingSwapRequest[] = pendingSwapRequests
     .map((req) => {
