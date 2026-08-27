@@ -14,7 +14,7 @@ const sourceSerif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "TA Scheduler",
+  title: "MyTeam110",
   description: "Office hours scheduling for undergraduate TAs",
 };
 

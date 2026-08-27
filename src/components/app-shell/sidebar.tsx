@@ -25,8 +25,8 @@ export function Sidebar({
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-bg-sidebar px-4 py-5">
       <Link href="/" className="flex items-baseline gap-1.5 px-2 pb-6">
-        <span className="text-lg font-extrabold tracking-tight">TA</span>
-        <span className="font-accent text-lg italic text-text-muted">Scheduler</span>
+        <span className="text-lg font-extrabold tracking-tight">My</span>
+        <span className="font-accent text-lg italic text-text-muted">Team110</span>
       </Link>
 
       <nav className="flex flex-1 flex-col gap-1">
