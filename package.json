@@ -13,6 +13,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:unseed": "tsx prisma/unseed.ts",
+    "db:seed:loadtest": "tsx prisma/seed-load-test.ts",
     "db:studio": "prisma studio",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
