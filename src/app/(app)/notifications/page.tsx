@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/app-shell/app-shell";
 import { LiveRefresh } from "@/components/live-refresh";
 import { notificationsChannel } from "@/lib/realtime";
 import { NOTIFICATION_ICON } from "@/lib/notification-icon";
+import { DismissButton } from "./dismiss-button";
 
 export default async function NotificationsPage() {
   const user = await requireUser();
@@ -37,10 +38,11 @@ export default async function NotificationsPage() {
                 }
               >
                 <Icon size={18} className="mt-0.5 shrink-0 text-accent" strokeWidth={2} />
-                <div>
+                <div className="flex-1">
                   <p className={isUnread ? "font-medium text-text" : "text-text"}>{n.message}</p>
                   <p className="mt-1 text-xs text-text-muted">{n.createdAt.toLocaleString()}</p>
                 </div>
+                <DismissButton notificationId={n.id} />
               </div>
             );
           })}
