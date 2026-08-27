@@ -118,7 +118,7 @@ async function main() {
     const email = `loadtest-${String(i).padStart(2, "0")}@test.dev`;
     const name = nameFor(i - 1);
     const taType: TaType = rand() < 0.5 ? "FIVE_HOUR" : "TEN_HOUR";
-    const isReturning = rand() < 0.25;
+    const isReturning = rand() < 0.8; // ~80% of real TAs are returning
     const weeklyQuota = taType === "FIVE_HOUR" ? 4 : 8;
 
     await upsertAuthUser(email);

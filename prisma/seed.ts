@@ -40,8 +40,8 @@ const QUOTA_BY_TA_TYPE: Record<TaType, number> = {
 };
 
 const SEED_USERS: SeedUser[] = [
-  { name: "Priya Nair", email: "prof1@test.dev", role: "PROFESSOR" },
-  { name: "David Kim", email: "prof2@test.dev", role: "PROFESSOR" },
+  { name: "Izzi Hinks", email: "prof1@test.dev", role: "PROFESSOR" },
+  { name: "Kris Jordan", email: "prof2@test.dev", role: "PROFESSOR" },
 
   { name: "Alex Chen", email: "ta1@test.dev", role: "UTA", taType: "FIVE_HOUR", isReturning: false },
   { name: "Jordan Lee", email: "ta2@test.dev", role: "UTA", taType: "FIVE_HOUR", isReturning: false },
